@@ -161,34 +161,35 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
         return GST_FLOW_OK;
     }
 
-    GstVideoMeta* meta = gst_buffer_get_video_meta(buffer);
-    if (!meta) {
-        return GST_FLOW_OK;
+    GstVideoInfo videoInfo;
+    {
+        GstCaps* caps = gst_sample_get_caps(sample);
+        gst_video_info_from_caps(&videoInfo, caps);
     }
 
-    int width = meta->width;
-    int height = meta->height;
+    int width = videoInfo.width;
+    int height = videoInfo.height;
 
     GstMemory *memory = gst_buffer_get_memory(buffer, 0);
     GstUnrefGuard<GstMemory> memory_unref_guard(memory);
 
-    GstMapInfo info;
-    if (!gst_memory_map(memory, &info, GST_MAP_READ)) {
+    GstMapInfo mapInfo;
+    if (!gst_memory_map(memory, &mapInfo, GST_MAP_READ)) {
         return GST_FLOW_OK;
     }
-    GstMemoryUnmapGuard memory_unmap_guard(memory, info);
+    GstMemoryUnmapGuard memory_unmap_guard(memory, mapInfo);
 
     Frame* frame = data->frame.write_access();
-    frame->init(width, height, 8, data->frameMode, -1, info.size);
+    frame->init(width, height, 8, data->frameMode, -1, mapInfo.size);
     frame->time = base::Time::now();
     frame->frame_status = STATUS_VALID;
 
     uint8_t* pixels = &(frame->image[0]);
-    if (frame->getNumberOfBytes() != info.size) {
+    if (frame->getNumberOfBytes() != mapInfo.size) {
         return GST_FLOW_OK;
     }
 
-    std::memcpy(pixels, info.data, frame->getNumberOfBytes());
+    std::memcpy(pixels, mapInfo.data, frame->getNumberOfBytes());
     data->frame.reset(frame);
     data->port->write(data->frame);
     return GST_FLOW_OK;
