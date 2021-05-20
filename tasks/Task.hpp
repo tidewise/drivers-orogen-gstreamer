@@ -26,29 +26,42 @@ namespace gstreamer {
     protected:
         typedef base::samples::frame::Frame Frame;
         typedef RTT::extras::ReadOnlyPointer<Frame> ROPtrFrame;
+        typedef RTT::InputPort<ROPtrFrame> FrameInputPort;
         typedef RTT::OutputPort<ROPtrFrame> FrameOutputPort;
 
-        struct ConfiguredOutput {
+        template<typename Port>
+        struct ConfiguredPort {
             Task& task;
             ROPtrFrame frame;
-            FrameOutputPort* port;
+            Port* port;
             base::samples::frame::frame_mode_t frameMode;
 
-            ConfiguredOutput(Task&, FrameOutputPort*, OutputConfig const&);
-            ConfiguredOutput(ConfiguredOutput const&) = delete;
-            ConfiguredOutput(ConfiguredOutput&&);
-            ~ConfiguredOutput();
+            ConfiguredPort(Task&, Port*, base::samples::frame::frame_mode_t frameMode);
+            ConfiguredPort(ConfiguredPort const&) = delete;
+            ConfiguredPort(ConfiguredPort&&);
+            ~ConfiguredPort();
         };
 
+        struct ConfiguredInput : ConfiguredPort<FrameInputPort> {
+            GstElement* appsrc = nullptr;
+
+            ConfiguredInput(GstElement*, Task&, FrameInputPort*, base::samples::frame::frame_mode_t);
+        };
+        typedef ConfiguredPort<FrameOutputPort> ConfiguredOutput;
+
+        static GstFlowReturn sourcePushSample(GstElement *sink, ConfiguredOutput **data);
         static GstFlowReturn sinkNewSample(GstElement *sink, ConfiguredOutput *data);
         void verifyNoNameCollision();
         GstElement* constructPipeline();
 
         GstElement* mPipeline = nullptr;
+        std::list<ConfiguredInput> mConfiguredInputs;
         std::list<ConfiguredOutput> mConfiguredOutputs;
 
-        void clearConfiguredOutputs();
+        void configureInputs(GstElement* pipeline);
         void configureOutputs(GstElement* pipeline);
+        bool processInputs();
+        bool pushFrame(GstElement* appsrc, Frame const& image);
     public:
         /** TaskContext constructor for Task
          * \param name Name of the task. This name needs to be unique to make

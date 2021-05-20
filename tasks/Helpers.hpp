@@ -17,6 +17,7 @@ namespace gstreamer {
     ROCK_GSTREAMER_UNREF(GstElement, gst_object_unref);
     ROCK_GSTREAMER_UNREF(GstCaps, gst_caps_unref);
     ROCK_GSTREAMER_UNREF(GstSample, gst_sample_unref);
+    ROCK_GSTREAMER_UNREF(GstBuffer, gst_buffer_unref);
     ROCK_GSTREAMER_UNREF(GstMemory, gst_memory_unref);
 
     template<typename T>

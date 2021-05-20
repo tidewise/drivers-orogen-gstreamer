@@ -42,6 +42,8 @@ bool Task::configureHook()
     auto* pipeline = constructPipeline();
     GstUnrefGuard<GstElement> unref_guard(pipeline);
 
+    mConfiguredInputs.clear();
+    configureInputs(pipeline);
     mConfiguredOutputs.clear();
     configureOutputs(pipeline);
 
@@ -61,6 +63,46 @@ GstElement* Task::constructPipeline() {
     }
 
     return element;
+}
+
+void Task::configureInputs(GstElement* pipeline) {
+    auto config = _inputs.get();
+    for (auto const& inputConfig : config) {
+        GstElement* appsrc =
+            gst_bin_get_by_name(GST_BIN(pipeline), inputConfig.name.c_str());
+        if (!appsrc) {
+            throw std::runtime_error(
+                "cannot find appsrc element named " + inputConfig.name +
+                "in pipeline"
+            );
+        }
+        GstUnrefGuard<GstElement> refguard(appsrc);
+
+        auto format = frameModeToGSTFormat(inputConfig.frameMode);
+        GstCaps* caps = gst_caps_new_simple(
+            "video/x-raw",
+            "format", G_TYPE_STRING, gst_video_format_to_string(format),
+            "width", G_TYPE_INT, inputConfig.width,
+            "height", G_TYPE_INT, inputConfig.height,
+            NULL
+        );
+        if (!caps) {
+            throw std::runtime_error("failed to generate caps");
+        }
+        GstUnrefGuard<GstCaps> caps_unref_guard(caps);
+        g_object_set(
+            appsrc,
+            "is-live", TRUE,
+            "caps", caps,
+            NULL
+        );
+
+        FrameInputPort* port = new FrameInputPort(inputConfig.name);
+        ports()->addEventPort(inputConfig.name, *port);
+        mConfiguredInputs.emplace_back(
+            std::move(ConfiguredInput(appsrc, *this, port, inputConfig.frameMode))
+        );
+    }
 }
 
 void Task::configureOutputs(GstElement* pipeline) {
@@ -97,7 +139,7 @@ void Task::configureOutputs(GstElement* pipeline) {
         FrameOutputPort* port = new FrameOutputPort(outputConfig.name);
         ports()->addPort(outputConfig.name, *port);
         mConfiguredOutputs.emplace_back(
-            std::move(ConfiguredOutput(*this, port, outputConfig))
+            std::move(ConfiguredOutput(*this, port, outputConfig.frameMode))
         );
 
         g_signal_connect(
@@ -111,16 +153,22 @@ bool Task::startHook()
 {
     if (! TaskBase::startHook())
         return false;
+
     auto ret = gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PLAYING);
-    if (ret == GST_STATE_CHANGE_ASYNC) {
-        GstClockTime timeout_ns = 5000000000ULL;
+
+    base::Time deadline = base::Time::now() + base::Time::fromSeconds(5);
+    while (ret == GST_STATE_CHANGE_ASYNC) {
+        if (base::Time::now() > deadline) {
+            throw std::runtime_error("GStreamer pipeline failed to initialize within 5s");
+        }
+
+        GstClockTime timeout_ns = 10000000ULL;
         ret = gst_element_get_state(
             GST_ELEMENT(mPipeline), NULL, NULL, timeout_ns
         );
-        if (ret == GST_STATE_CHANGE_ASYNC) {
-            throw std::runtime_error(
-                "pipeline blocked: failed to transition to PLAYING within 5s"
-            );
+
+        if (!processInputs()) {
+            return false;
         }
     }
 
@@ -131,8 +179,12 @@ bool Task::startHook()
 }
 void Task::updateHook()
 {
+    if (!processInputs()) {
+        return;
+    }
     TaskBase::updateHook();
 }
+
 void Task::errorHook()
 {
     TaskBase::errorHook();
@@ -148,6 +200,35 @@ void Task::cleanupHook()
     gst_object_unref(mPipeline);
     mConfiguredOutputs.clear();
     TaskBase::cleanupHook();
+}
+
+bool Task::processInputs() {
+    for (auto& configuredInput : mConfiguredInputs) {
+        while (configuredInput.port->read(configuredInput.frame, false) == RTT::NewData) {
+            Frame const& frame = *configuredInput.frame;
+            if (frame.frame_mode != configuredInput.frameMode) {
+                exception(INVALID_INPUT_FRAME_MODE);
+                return false;
+            }
+            if (!pushFrame(configuredInput.appsrc, *configuredInput.frame)) {
+                exception(GSTREAMER_ERROR);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool Task::pushFrame(GstElement* element, Frame const& frame) {
+    /* Create a buffer to wrap the last received image */
+    GstBuffer *buffer = gst_buffer_new_and_alloc(frame.image.size());
+    GstUnrefGuard<GstBuffer> unref_guard(buffer);
+
+    gst_buffer_fill(buffer, 0, frame.image.data(), frame.image.size());
+    GstFlowReturn ret;
+    g_signal_emit_by_name(element, "push-buffer", buffer, &ret);
+
+    return ret == GST_FLOW_OK;
 }
 
 GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data) {
@@ -196,19 +277,21 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
 }
 
 
-Task::ConfiguredOutput::ConfiguredOutput(
-    Task& task, FrameOutputPort* port, OutputConfig const& config
+template<typename Port>
+Task::ConfiguredPort<Port>::ConfiguredPort(
+    Task& task, Port* port, base::samples::frame::frame_mode_t frameMode
 )
     : task(task)
     , port(port)
-    , frameMode(config.frameMode)
+    , frameMode(frameMode)
 {
     Frame* f = new Frame();
     f->init(0, 0, 8, frameMode);
     frame.reset(f);
 }
 
-Task::ConfiguredOutput::ConfiguredOutput(ConfiguredOutput&& other)
+template<typename Port>
+Task::ConfiguredPort<Port>::ConfiguredPort(ConfiguredPort&& other)
     : task(other.task)
     , frame(other.frame.write_access())
     , port(other.port)
@@ -216,9 +299,17 @@ Task::ConfiguredOutput::ConfiguredOutput(ConfiguredOutput&& other)
     other.port = nullptr;
 }
 
-Task::ConfiguredOutput::~ConfiguredOutput() {
+template<typename Port>
+Task::ConfiguredPort<Port>::~ConfiguredPort() {
     if (port) {
         task.ports()->removePort(port->getName());
         delete port;
     }
+}
+
+Task::ConfiguredInput::ConfiguredInput(
+    GstElement* appsrc, Task& task, Task::FrameInputPort* port, base::samples::frame::frame_mode_t frameMode
+)
+    : ConfiguredPort<Task::FrameInputPort>(task, port, frameMode)
+    , appsrc(appsrc) {
 }

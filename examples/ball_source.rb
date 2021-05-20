@@ -6,9 +6,7 @@ Syskit.extend_model OroGen.gstreamer.Task do
     def configure
         super
         properties.pipeline = <<~PIPELINE
-            videotestsrc name=test pattern=ball ! tee name=t
-            t. ! queue ! videoconvert ! appsink name=ball
-            t. ! queue ! xvimagesink
+            videotestsrc pattern=ball ! queue ! videoconvert ! appsink name=ball
         PIPELINE
         properties.outputs = [{ name: "ball", frameMode: "MODE_RGB" }]
     end
@@ -17,6 +15,6 @@ end
 Robot.controller do
     Roby.plan.add_mission_task(
         OroGen.gstreamer.Task
-              .deployed_as_unmanaged("gstreamer_ball")
+              .deployed_as("ball_source")
     )
 end

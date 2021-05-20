@@ -49,4 +49,8 @@ task_context "Task" do
 
     dynamic_input_port(/\w+/, ro_ptr("/base/samples/frame/Frame"))
     dynamic_output_port(/\w+/, ro_ptr("/base/samples/frame/Frame"))
+
+    exception_states :INVALID_INPUT_FRAME_MODE, :GSTREAMER_ERROR
+
+    port_driven
 end
