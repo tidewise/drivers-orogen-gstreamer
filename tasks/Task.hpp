@@ -67,7 +67,7 @@ namespace gstreamer {
 
         void configureInputs(GstElement* pipeline);
         void configureOutputs(GstElement* pipeline);
-        void waitFirstFrames();
+        void waitFirstFrames(base::Time const& deadline);
         bool processInputs();
         bool pushFrame(GstElement* appsrc, Frame const& image);
     public:

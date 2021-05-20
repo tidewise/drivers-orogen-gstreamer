@@ -141,12 +141,12 @@ bool Task::startHook()
     if (! TaskBase::startHook())
         return false;
 
+    base::Time deadline = base::Time::now() + _pipeline_initialization_timeout.get();
+
     gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PAUSED);
-    waitFirstFrames();
+    waitFirstFrames(deadline);
 
     auto ret = gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PLAYING);
-
-    base::Time deadline = base::Time::now() + _pipeline_initialization_timeout.get();
     while (ret == GST_STATE_CHANGE_ASYNC) {
         if (base::Time::now() > deadline) {
             throw std::runtime_error("GStreamer pipeline failed to initialize within 5s");
@@ -192,7 +192,7 @@ void Task::cleanupHook()
     TaskBase::cleanupHook();
 }
 
-void Task::waitFirstFrames() {
+void Task::waitFirstFrames(base::Time const& deadline) {
     bool all = false;
     while(!all) {
         all = true;
@@ -201,6 +201,10 @@ void Task::waitFirstFrames() {
                 all = false;
                 continue;
             }
+        }
+
+        if (base::Time::now() > deadline) {
+            throw std::runtime_error("timed out while waiting for the first frames");
         }
     }
 
