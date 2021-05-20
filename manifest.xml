@@ -6,4 +6,6 @@
   <depend package="base/cmake" />
   <depend package="base/orogen/types" />
   <depend package="gstreamer" />
+
+  <test_depend package="tools/syskit" />
 </package>

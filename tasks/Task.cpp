@@ -13,6 +13,7 @@ using namespace base::samples::frame;
 Task::Task(std::string const& name)
     : TaskBase(name)
 {
+    _pipeline_initialization_timeout.set(base::Time::fromSeconds(5));
 }
 
 Task::~Task()
@@ -145,7 +146,7 @@ bool Task::startHook()
 
     auto ret = gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PLAYING);
 
-    base::Time deadline = base::Time::now() + base::Time::fromSeconds(5);
+    base::Time deadline = base::Time::now() + _pipeline_initialization_timeout.get();
     while (ret == GST_STATE_CHANGE_ASYNC) {
         if (base::Time::now() > deadline) {
             throw std::runtime_error("GStreamer pipeline failed to initialize within 5s");

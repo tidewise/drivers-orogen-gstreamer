@@ -39,6 +39,9 @@ task_context "Task" do
     needs_global_initializer :gstreamer
 
     # The GStreamer pipeline
+    property "pipeline_initialization_timeout", "base/Time"
+
+    # The GStreamer pipeline
     property "pipeline", "string"
 
     # Configuration of Rock input ports to be injected in the pipeline
