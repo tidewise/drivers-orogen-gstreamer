@@ -29,14 +29,19 @@ namespace gstreamer {
         typedef RTT::InputPort<ROPtrFrame> FrameInputPort;
         typedef RTT::OutputPort<ROPtrFrame> FrameOutputPort;
 
+        typedef base::samples::frame::frame_mode_t FrameMode;
+
         template<typename Port>
         struct ConfiguredPort {
             Task& task;
             ROPtrFrame frame;
             Port* port;
-            base::samples::frame::frame_mode_t frameMode;
+            FrameMode frameMode;
 
-            ConfiguredPort(Task&, Port*, base::samples::frame::frame_mode_t frameMode);
+            ConfiguredPort(
+                Task&, Port*,
+                FrameMode frameMode = base::samples::frame::MODE_UNDEFINED
+            );
             ConfiguredPort(ConfiguredPort const&) = delete;
             ConfiguredPort(ConfiguredPort&&);
             ~ConfiguredPort();
@@ -44,8 +49,10 @@ namespace gstreamer {
 
         struct ConfiguredInput : ConfiguredPort<FrameInputPort> {
             GstElement* appsrc = nullptr;
+            uint32_t width = 0;
+            uint32_t height = 0;
 
-            ConfiguredInput(GstElement*, Task&, FrameInputPort*, base::samples::frame::frame_mode_t);
+            ConfiguredInput(GstElement*, Task&, FrameInputPort*);
         };
         typedef ConfiguredPort<FrameOutputPort> ConfiguredOutput;
 
@@ -60,6 +67,7 @@ namespace gstreamer {
 
         void configureInputs(GstElement* pipeline);
         void configureOutputs(GstElement* pipeline);
+        void waitFirstFrames();
         bool processInputs();
         bool pushFrame(GstElement* appsrc, Frame const& image);
     public:

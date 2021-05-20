@@ -29,12 +29,12 @@ Syskit.extend_model OroGen.gstreamer.Task do
             properties.pipeline = <<~PIPELINE
                 videotestsrc pattern=ball ! queue ! videoconvert ! appsink name=ball
             PIPELINE
-            properties.outputs = [{ name: "ball", frameMode: "MODE_RGB" }]
+            properties.outputs = [{ name: "ball", frame_mode: "MODE_RGB" }]
         elsif mode == 2
             properties.pipeline = <<~PIPELINE
                 appsrc name=ball ! queue ! videoconvert ! xvimagesink
             PIPELINE
-            properties.inputs = [{ name: "ball", frameMode: "MODE_RGB", width: 320, height: 240 }]
+            properties.inputs = [{ name: "ball" }]
         else
             raise "mode: #{mode}"
         end

@@ -77,30 +77,16 @@ void Task::configureInputs(GstElement* pipeline) {
             );
         }
         GstUnrefGuard<GstElement> refguard(appsrc);
-
-        auto format = frameModeToGSTFormat(inputConfig.frameMode);
-        GstCaps* caps = gst_caps_new_simple(
-            "video/x-raw",
-            "format", G_TYPE_STRING, gst_video_format_to_string(format),
-            "width", G_TYPE_INT, inputConfig.width,
-            "height", G_TYPE_INT, inputConfig.height,
-            NULL
-        );
-        if (!caps) {
-            throw std::runtime_error("failed to generate caps");
-        }
-        GstUnrefGuard<GstCaps> caps_unref_guard(caps);
         g_object_set(
             appsrc,
             "is-live", TRUE,
-            "caps", caps,
             NULL
         );
 
         FrameInputPort* port = new FrameInputPort(inputConfig.name);
         ports()->addEventPort(inputConfig.name, *port);
         mConfiguredInputs.emplace_back(
-            std::move(ConfiguredInput(appsrc, *this, port, inputConfig.frameMode))
+            std::move(ConfiguredInput(appsrc, *this, port))
         );
     }
 }
@@ -118,7 +104,7 @@ void Task::configureOutputs(GstElement* pipeline) {
         }
         GstUnrefGuard<GstElement> refguard(appsink);
 
-        auto format = frameModeToGSTFormat(outputConfig.frameMode);
+        auto format = frameModeToGSTFormat(outputConfig.frame_mode);
         GstCaps* caps = gst_caps_new_simple(
             "video/x-raw",
             "format", G_TYPE_STRING, gst_video_format_to_string(format),
@@ -139,7 +125,7 @@ void Task::configureOutputs(GstElement* pipeline) {
         FrameOutputPort* port = new FrameOutputPort(outputConfig.name);
         ports()->addPort(outputConfig.name, *port);
         mConfiguredOutputs.emplace_back(
-            std::move(ConfiguredOutput(*this, port, outputConfig.frameMode))
+            std::move(ConfiguredOutput(*this, port, outputConfig.frame_mode))
         );
 
         g_signal_connect(
@@ -153,6 +139,9 @@ bool Task::startHook()
 {
     if (! TaskBase::startHook())
         return false;
+
+    gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PAUSED);
+    waitFirstFrames();
 
     auto ret = gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PLAYING);
 
@@ -202,12 +191,48 @@ void Task::cleanupHook()
     TaskBase::cleanupHook();
 }
 
+void Task::waitFirstFrames() {
+    for (auto& configuredInput : mConfiguredInputs) {
+        if (configuredInput.port->read(configuredInput.frame, false) == RTT::NoData) {
+            continue;
+        }
+
+        configuredInput.frameMode = configuredInput.frame->frame_mode;
+        configuredInput.width = configuredInput.frame->size.width;
+        configuredInput.height = configuredInput.frame->size.height;
+    }
+
+    for (auto& configuredInput : mConfiguredInputs) {
+        auto format = frameModeToGSTFormat(configuredInput.frameMode);
+        GstCaps* caps = gst_caps_new_simple(
+            "video/x-raw",
+            "format", G_TYPE_STRING, gst_video_format_to_string(format),
+            "width", G_TYPE_INT, configuredInput.width,
+            "height", G_TYPE_INT, configuredInput.height,
+            NULL
+        );
+        if (!caps) {
+            throw std::runtime_error("failed to generate caps");
+        }
+        GstUnrefGuard<GstCaps> caps_unref_guard(caps);
+        g_object_set(
+            configuredInput.appsrc,
+            "caps", caps,
+            NULL
+        );
+
+        pushFrame(configuredInput.appsrc, *configuredInput.frame);
+    }
+}
+
 bool Task::processInputs() {
     for (auto& configuredInput : mConfiguredInputs) {
         while (configuredInput.port->read(configuredInput.frame, false) == RTT::NewData) {
             Frame const& frame = *configuredInput.frame;
-            if (frame.frame_mode != configuredInput.frameMode) {
-                exception(INVALID_INPUT_FRAME_MODE);
+            if (frame.frame_mode != configuredInput.frameMode ||
+                frame.size.width != configuredInput.width ||
+                frame.size.height != configuredInput.height) {
+                exception(INPUT_FRAME_CHANGED_PARAMETERS);
                 return false;
             }
             if (!pushFrame(configuredInput.appsrc, *configuredInput.frame)) {
@@ -279,7 +304,7 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
 
 template<typename Port>
 Task::ConfiguredPort<Port>::ConfiguredPort(
-    Task& task, Port* port, base::samples::frame::frame_mode_t frameMode
+    Task& task, Port* port, FrameMode frameMode
 )
     : task(task)
     , port(port)
@@ -308,8 +333,8 @@ Task::ConfiguredPort<Port>::~ConfiguredPort() {
 }
 
 Task::ConfiguredInput::ConfiguredInput(
-    GstElement* appsrc, Task& task, Task::FrameInputPort* port, base::samples::frame::frame_mode_t frameMode
+    GstElement* appsrc, Task& task, Task::FrameInputPort* port
 )
-    : ConfiguredPort<Task::FrameInputPort>(task, port, frameMode)
+    : ConfiguredPort<Task::FrameInputPort>(task, port)
     , appsrc(appsrc) {
 }
