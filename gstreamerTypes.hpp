@@ -1,14 +1,34 @@
 #ifndef gstreamer_TYPES_HPP
 #define gstreamer_TYPES_HPP
 
-/* If you need to define types specific to your oroGen components, define them
- * here. Required headers must be included explicitly
- *
- * However, it is common that you will only import types from your library, in
- * which case you do not need this file
- */
+#include <string>
+#include <base/samples/Frame.hpp>
 
 namespace gstreamer {
+    /** Description of an injection of images from an image input port to
+     * the gstreamer pipeline
+     */
+    struct InputConfig {
+        /** Input port name */
+        std::string portName;
+        /** Name of the appsrc element that will be used to inject the frames
+         *
+         * It must be created by the component's 'pipeline' property
+         */
+        std::string appsrcName;
+    };
+
+    /** Description of an export from the gstreamer pipeline to an image port */
+    struct OutputConfig {
+        /** Output name
+         *
+         * This is the name of both the output port and of the appsink element
+         * in the pipeline it will be connected to
+         */
+        std::string name;
+        /** Target pixel format */
+        base::samples::frame::frame_mode_t frameMode = base::samples::frame::MODE_RGB;
+    };
 }
 
 #endif

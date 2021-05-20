@@ -5,6 +5,9 @@
 
 #include "gstreamer/TaskBase.hpp"
 
+#include <gst/app/gstappsink.h>
+#include <gst/app/gstappsrc.h>
+
 namespace gstreamer {
     /*! \class Task
      * \brief Declare a new task context (i.e., a component)
@@ -21,7 +24,31 @@ namespace gstreamer {
         friend class TaskBase;
 
     protected:
+        typedef base::samples::frame::Frame Frame;
+        typedef RTT::extras::ReadOnlyPointer<Frame> ROPtrFrame;
+        typedef RTT::OutputPort<ROPtrFrame> FrameOutputPort;
 
+        struct ConfiguredOutput {
+            Task& task;
+            ROPtrFrame frame;
+            FrameOutputPort* port;
+            base::samples::frame::frame_mode_t frameMode;
+
+            ConfiguredOutput(Task&, FrameOutputPort*, OutputConfig const&);
+            ConfiguredOutput(ConfiguredOutput const&) = delete;
+            ConfiguredOutput(ConfiguredOutput&&);
+            ~ConfiguredOutput();
+        };
+
+        static GstFlowReturn sinkNewSample(GstElement *sink, ConfiguredOutput *data);
+        void verifyNoNameCollision();
+        GstElement* constructPipeline();
+
+        GstElement* mPipeline = nullptr;
+        std::list<ConfiguredOutput> mConfiguredOutputs;
+
+        void clearConfiguredOutputs();
+        void configureOutputs(GstElement* pipeline);
     public:
         /** TaskContext constructor for Task
          * \param name Name of the task. This name needs to be unique to make
