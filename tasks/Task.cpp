@@ -193,17 +193,22 @@ void Task::cleanupHook()
 }
 
 void Task::waitFirstFrames() {
-    for (auto& configuredInput : mConfiguredInputs) {
-        if (configuredInput.port->read(configuredInput.frame, false) == RTT::NoData) {
-            continue;
+    bool all = false;
+    while(!all) {
+        all = true;
+        for (auto& configuredInput : mConfiguredInputs) {
+            if (configuredInput.port->read(configuredInput.frame, false) == RTT::NoData) {
+                all = false;
+                continue;
+            }
         }
-
-        configuredInput.frameMode = configuredInput.frame->frame_mode;
-        configuredInput.width = configuredInput.frame->size.width;
-        configuredInput.height = configuredInput.frame->size.height;
     }
 
     for (auto& configuredInput : mConfiguredInputs) {
+        configuredInput.frameMode = configuredInput.frame->frame_mode;
+        configuredInput.width = configuredInput.frame->size.width;
+        configuredInput.height = configuredInput.frame->size.height;
+
         auto format = frameModeToGSTFormat(configuredInput.frameMode);
         GstCaps* caps = gst_caps_new_simple(
             "video/x-raw",
