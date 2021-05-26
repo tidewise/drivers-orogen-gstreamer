@@ -129,6 +129,7 @@ void Task::configureOutputs(GstElement* pipeline) {
             std::move(ConfiguredOutput(*this, port, outputConfig.frame_mode))
         );
 
+        port->setDataSample(mConfiguredOutputs.back().frame);
         g_signal_connect(
             appsink,
             "new-sample", G_CALLBACK(sinkNewSample), &mConfiguredOutputs.back()
