@@ -6,3 +6,5 @@ build/*
 
 *autobuild-stamp
 
+.vscode/c_cpp_properties.json
+examples/app/
