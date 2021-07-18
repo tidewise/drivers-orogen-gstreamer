@@ -151,7 +151,8 @@ bool Task::startHook()
     auto ret = gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PLAYING);
     while (ret == GST_STATE_CHANGE_ASYNC) {
         if (base::Time::now() > deadline) {
-            throw std::runtime_error("GStreamer pipeline failed to initialize within 5s");
+            throw std::runtime_error("GStreamer pipeline failed to initialize within "
+                                     "the configured time");
         }
 
         GstClockTime timeout_ns = 10000000ULL;
