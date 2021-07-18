@@ -31,4 +31,5 @@ received frame. Output configuration must contain the desired frame format,
 which is then announced to the GStreamer pipeline. One may have to add a
 `videoconvert` node to convert to the desired format.
 
-Run Syskit with GST_DEBUG to 2 to see errors in the text log.
+Run Syskit with GST_DEBUG to 2 to see errors in the text log, up to 6 for a whole trace.
+Since Syskit redirects to file, we recommend setting GST_DEBUG_COLOR_MODE to off.
