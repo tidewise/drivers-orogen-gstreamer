@@ -155,7 +155,7 @@ bool Task::startHook()
                                      "the configured time");
         }
 
-        GstClockTime timeout_ns = 10000000ULL;
+        GstClockTime timeout_ns = 50000000ULL;
         ret = gst_element_get_state(
             GST_ELEMENT(mPipeline), NULL, NULL, timeout_ns
         );
