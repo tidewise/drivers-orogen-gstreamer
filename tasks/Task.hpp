@@ -31,6 +31,8 @@ namespace gstreamer {
 
         typedef base::samples::frame::frame_mode_t FrameMode;
 
+        RTT::os::Mutex mSync;
+
         template<typename Port>
         struct ConfiguredPort {
             Task& task;
@@ -64,12 +66,14 @@ namespace gstreamer {
         GstElement* mPipeline = nullptr;
         std::list<ConfiguredInput> mConfiguredInputs;
         std::list<ConfiguredOutput> mConfiguredOutputs;
+        std::vector<std::string> mErrorQueue;
 
         void configureInputs(GstElement* pipeline);
         void configureOutputs(GstElement* pipeline);
         void waitFirstFrames(base::Time const& deadline);
         bool processInputs();
         bool pushFrame(GstElement* appsrc, Frame const& image);
+        void queueError(std::string const& message);
     public:
         /** TaskContext constructor for Task
          * \param name Name of the task. This name needs to be unique to make

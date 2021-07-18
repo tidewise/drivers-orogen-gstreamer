@@ -142,6 +142,7 @@ bool Task::startHook()
     if (! TaskBase::startHook())
         return false;
 
+    mErrorQueue.clear();
     base::Time deadline = base::Time::now() + _pipeline_initialization_timeout.get();
 
     gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PAUSED);
@@ -168,11 +169,24 @@ bool Task::startHook()
     }
     return true;
 }
+
+void Task::queueError(std::string const& message) {
+    RTT::os::MutexLock lock(mSync);
+    mErrorQueue.push_back(message);
+}
 void Task::updateHook()
 {
     if (!processInputs()) {
         return;
     }
+
+    {
+        RTT::os::MutexLock lock(mSync);
+        if (!mErrorQueue.empty()) {
+            throw std::runtime_error(mErrorQueue.front());
+        }
+    }
+
     TaskBase::updateHook();
 }
 
