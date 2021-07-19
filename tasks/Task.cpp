@@ -142,6 +142,7 @@ bool Task::startHook()
     if (! TaskBase::startHook())
         return false;
 
+    mErrorQueue.clear();
     base::Time deadline = base::Time::now() + _pipeline_initialization_timeout.get();
 
     gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PAUSED);
@@ -150,10 +151,11 @@ bool Task::startHook()
     auto ret = gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PLAYING);
     while (ret == GST_STATE_CHANGE_ASYNC) {
         if (base::Time::now() > deadline) {
-            throw std::runtime_error("GStreamer pipeline failed to initialize within 5s");
+            throw std::runtime_error("GStreamer pipeline failed to initialize within "
+                                     "the configured time");
         }
 
-        GstClockTime timeout_ns = 10000000ULL;
+        GstClockTime timeout_ns = 50000000ULL;
         ret = gst_element_get_state(
             GST_ELEMENT(mPipeline), NULL, NULL, timeout_ns
         );
@@ -168,11 +170,24 @@ bool Task::startHook()
     }
     return true;
 }
+
+void Task::queueError(std::string const& message) {
+    RTT::os::MutexLock lock(mSync);
+    mErrorQueue.push_back(message);
+}
 void Task::updateHook()
 {
     if (!processInputs()) {
         return;
     }
+
+    {
+        RTT::os::MutexLock lock(mSync);
+        if (!mErrorQueue.empty()) {
+            throw std::runtime_error(mErrorQueue.front());
+        }
+    }
+
     TaskBase::updateHook();
 }
 
@@ -232,7 +247,8 @@ void Task::waitFirstFrames(base::Time const& deadline) {
             NULL
         );
 
-        pushFrame(configuredInput.appsrc, *configuredInput.frame);
+        gst_video_info_from_caps(&configuredInput.info, caps);
+        pushFrame(configuredInput.appsrc, configuredInput.info, *configuredInput.frame);
     }
 }
 
@@ -246,7 +262,8 @@ bool Task::processInputs() {
                 exception(INPUT_FRAME_CHANGED_PARAMETERS);
                 return false;
             }
-            if (!pushFrame(configuredInput.appsrc, *configuredInput.frame)) {
+
+            if (!pushFrame(configuredInput.appsrc, configuredInput.info, *configuredInput.frame)) {
                 exception(GSTREAMER_ERROR);
                 return false;
             }
@@ -255,12 +272,30 @@ bool Task::processInputs() {
     return true;
 }
 
-bool Task::pushFrame(GstElement* element, Frame const& frame) {
+bool Task::pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame) {
     /* Create a buffer to wrap the last received image */
-    GstBuffer *buffer = gst_buffer_new_and_alloc(frame.image.size());
+    GstBuffer *buffer = gst_buffer_new_and_alloc(info.size);
     GstUnrefGuard<GstBuffer> unref_guard(buffer);
 
-    gst_buffer_fill(buffer, 0, frame.image.data(), frame.image.size());
+    int sourceStride = frame.getRowSize();
+    int targetStride = GST_VIDEO_INFO_PLANE_STRIDE(&info, 0);
+    if (targetStride != sourceStride) {
+        GstVideoFrame vframe;
+        gst_video_frame_map(&vframe, &info, buffer, GST_MAP_WRITE);
+        GstUnrefGuard<GstVideoFrame> memory_unmap_guard(&vframe);
+        guint8* pixels = static_cast<uint8_t*>(GST_VIDEO_FRAME_PLANE_DATA(&vframe, 0));
+        int targetStride = GST_VIDEO_FRAME_PLANE_STRIDE(&vframe, 0);
+        int rowSize = frame.getRowSize();
+        for (int i = 0; i < info.height; ++i) {
+            memcpy(pixels + i * targetStride,
+                   frame.image.data() + i * sourceStride,
+                   rowSize);
+        }
+    }
+    else {
+        gst_buffer_fill(buffer, 0, frame.image.data(), frame.image.size());
+    }
+
     GstFlowReturn ret;
     g_signal_emit_by_name(element, "push-buffer", buffer, &ret);
 
@@ -296,18 +331,35 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
     }
     GstMemoryUnmapGuard memory_unmap_guard(memory, mapInfo);
 
-    Frame* frame = data->frame.write_access();
-    frame->init(width, height, 8, data->frameMode, -1, mapInfo.size);
+    std::unique_ptr<Frame> frame(data->frame.write_access());
+    frame->init(width, height, 8, data->frameMode);
+
     frame->time = base::Time::now();
     frame->frame_status = STATUS_VALID;
 
     uint8_t* pixels = &(frame->image[0]);
-    if (frame->getNumberOfBytes() != mapInfo.size) {
+    if (frame->getNumberOfBytes() > mapInfo.size) {
+        data->task.queueError(
+            "Inconsistent number of bytes. Rock's image type calculated " +
+            to_string(frame->getNumberOfBytes()) + " while GStreamer only has " +
+            to_string(mapInfo.size)
+        );
         return GST_FLOW_OK;
     }
 
-    std::memcpy(pixels, mapInfo.data, frame->getNumberOfBytes());
-    data->frame.reset(frame);
+    int sourceStride = videoInfo.stride[0];
+    int targetStride = frame->getRowSize();
+    if (sourceStride != targetStride) {
+        for (int i = 0; i < height; ++i) {
+            std::memcpy(pixels + targetStride * i,
+                        mapInfo.data + sourceStride * i,
+                        frame->getRowSize());
+        }
+    }
+    else {
+        std::memcpy(pixels, mapInfo.data, frame->getNumberOfBytes());
+    }
+    data->frame.reset(frame.release());
     data->port->write(data->frame);
     return GST_FLOW_OK;
 }

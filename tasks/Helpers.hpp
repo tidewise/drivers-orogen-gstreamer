@@ -19,6 +19,7 @@ namespace gstreamer {
     ROCK_GSTREAMER_UNREF(GstSample, gst_sample_unref);
     ROCK_GSTREAMER_UNREF(GstBuffer, gst_buffer_unref);
     ROCK_GSTREAMER_UNREF(GstMemory, gst_memory_unref);
+    ROCK_GSTREAMER_UNREF(GstVideoFrame, gst_video_frame_unmap);
 
     template<typename T>
     struct GstUnrefGuard {

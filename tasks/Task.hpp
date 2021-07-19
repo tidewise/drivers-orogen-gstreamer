@@ -7,6 +7,7 @@
 
 #include <gst/app/gstappsink.h>
 #include <gst/app/gstappsrc.h>
+#include <gst/video/video-info.h>
 
 namespace gstreamer {
     /*! \class Task
@@ -31,6 +32,8 @@ namespace gstreamer {
 
         typedef base::samples::frame::frame_mode_t FrameMode;
 
+        RTT::os::Mutex mSync;
+
         template<typename Port>
         struct ConfiguredPort {
             Task& task;
@@ -49,6 +52,7 @@ namespace gstreamer {
 
         struct ConfiguredInput : ConfiguredPort<FrameInputPort> {
             GstElement* appsrc = nullptr;
+            GstVideoInfo info;
             uint32_t width = 0;
             uint32_t height = 0;
 
@@ -64,12 +68,15 @@ namespace gstreamer {
         GstElement* mPipeline = nullptr;
         std::list<ConfiguredInput> mConfiguredInputs;
         std::list<ConfiguredOutput> mConfiguredOutputs;
+        std::vector<std::string> mErrorQueue;
 
         void configureInputs(GstElement* pipeline);
         void configureOutputs(GstElement* pipeline);
         void waitFirstFrames(base::Time const& deadline);
         bool processInputs();
-        bool pushFrame(GstElement* appsrc, Frame const& image);
+        bool pushFrame(GstElement* appsrc, GstVideoInfo& info, Frame const& image);
+        void queueError(std::string const& message);
+
     public:
         /** TaskContext constructor for Task
          * \param name Name of the task. This name needs to be unique to make
