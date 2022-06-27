@@ -122,6 +122,10 @@ describe OroGen.gstreamer.Task do
 
         expected = File.binread(File.join(__dir__, "videotestsrc_colors_319_240.bin"))
         2.times do |i|
+            File.binwrite(
+                File.join(__dir__, "videotestsrc_colors_319_240_sample_#{i}.bin"),
+                samples[i].image.to_byte_array
+            )
             assert_equal 319, samples[i].size.width
             assert_equal 240, samples[i].size.height
             assert_equal :MODE_RGB, samples[i].frame_mode
