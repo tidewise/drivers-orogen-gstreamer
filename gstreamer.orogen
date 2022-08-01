@@ -5,7 +5,9 @@ name "gstreamer"
 using_library "base-logging", typekit: false
 using_library "gstreamer-video-1.0", typekit: false
 using_library "gstreamer-app-1.0", typekit: false
+using_library "aggregator"
 
+import_types_from "aggregator"
 import_types_from "gstreamerTypes.hpp"
 import_types_from "std"
 import_types_from "base"

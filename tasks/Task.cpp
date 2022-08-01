@@ -5,6 +5,7 @@
 
 #include "Task.hpp"
 #include "Helpers.hpp"
+#include "aggregator/TimestampEstimator.hpp"
 
 using namespace std;
 using namespace gstreamer;
@@ -19,6 +20,11 @@ Task::Task(std::string const& name)
 Task::~Task()
 {
 }
+
+
+
+
+
 
 /// The following lines are template definitions for the various state machine
 // hooks defined by Orocos::RTT. See Task.hpp for more detailed
@@ -124,14 +130,25 @@ void Task::configureOutputs(GstElement* pipeline) {
         );
 
         FrameOutputPort* port = new FrameOutputPort(outputConfig.name);
-        ports()->addPort(outputConfig.name, *port);
-        mConfiguredOutputs.emplace_back(
-            std::move(ConfiguredOutput(*this, port, outputConfig.frame_mode))
+        
+        auto timestamperStatuPortName = outputConfig.name + "_timestamper_status";
+        auto timestamperStatusPort = new TimestamperStatusPort(timestamperStatuPortName);
+        
+        ConfiguredOutput configuredOutput(*this, timestamperStatusPort, port, outputConfig.frame_mode);
+        configuredOutput.mTimestamper = aggregator::TimestampEstimator(
+            outputConfig.window,
+            outputConfig.estimate,
+            outputConfig.sample_loss_threshold
         );
 
-        port->setDataSample(mConfiguredOutputs.back().frame);
+        port->setDataSample(configuredOutput.frame);
+        ports()->addPort(outputConfig.name, *port);
+        ports()->addPort(timestamperStatuPortName, *timestamperStatusPort);
+        mConfiguredOutputs.emplace_back(std::move(configuredOutput));
+
         g_signal_connect(
             appsink,
+             // !!! HERE: last argument must have the lifetime of the task
             "new-sample", G_CALLBACK(sinkNewSample), &mConfiguredOutputs.back()
         );
     }
@@ -168,6 +185,11 @@ bool Task::startHook()
     if (ret == GST_STATE_CHANGE_FAILURE) {
         throw std::runtime_error("pipeline failed to start");
     }
+    // Resetting the timestamper estimator.
+    for (auto& configuredOutput : mConfiguredOutputs){
+        configuredOutput.mTimestamper.reset();
+    }
+
     return true;
 }
 
@@ -177,6 +199,8 @@ void Task::queueError(std::string const& message) {
 }
 void Task::updateHook()
 {
+    TaskBase::updateHook();
+
     if (!processInputs()) {
         return;
     }
@@ -187,8 +211,6 @@ void Task::updateHook()
             throw std::runtime_error(mErrorQueue.front());
         }
     }
-
-    TaskBase::updateHook();
 }
 
 void Task::errorHook()
@@ -334,7 +356,7 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
     std::unique_ptr<Frame> frame(data->frame.write_access());
     frame->init(width, height, 8, data->frameMode);
 
-    frame->time = base::Time::now();
+    frame->time = data->mTimestamper.update(base::Time::now());
     frame->frame_status = STATUS_VALID;
 
     uint8_t* pixels = &(frame->image[0]);
@@ -361,6 +383,9 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
     }
     data->frame.reset(frame.release());
     data->port->write(data->frame);
+    data->mTimestamperStatusPort->write(
+        data->mTimestamper.getStatus()
+    );
     return GST_FLOW_OK;
 }
 
@@ -400,4 +425,25 @@ Task::ConfiguredInput::ConfiguredInput(
 )
     : ConfiguredPort<Task::FrameInputPort>(task, port)
     , appsrc(appsrc) {
+}
+
+
+Task::ConfiguredOutput::ConfiguredOutput(
+    Task& task, Task::TimestamperStatusPort* statusPort, Task::FrameOutputPort* port, FrameMode frameMode
+)
+    : ConfiguredPort<Task::FrameOutputPort>(task, port, frameMode)
+    , mTimestamperStatusPort(statusPort) {
+}
+Task::ConfiguredOutput::ConfiguredOutput(ConfiguredOutput&& src)
+//    : ConfiguredPort<Task::FrameOutputPort>(std::move(src))
+    : ConfiguredOutput(src.task, src.mTimestamperStatusPort, src.port, src.frameMode) {
+    frame.reset(src.frame.write_access());
+    src.port = nullptr;
+    src.mTimestamperStatusPort = nullptr;
+}
+Task::ConfiguredOutput::~ConfiguredOutput() {
+    if (mTimestamperStatusPort) {
+        task.ports()->removePort(mTimestamperStatusPort->getName());
+        delete mTimestamperStatusPort;
+    }
 }
