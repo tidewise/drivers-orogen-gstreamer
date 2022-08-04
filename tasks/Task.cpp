@@ -5,6 +5,7 @@
 
 #include "Task.hpp"
 #include "Helpers.hpp"
+#include "aggregator/TimestampEstimator.hpp"
 
 using namespace std;
 using namespace gstreamer;
@@ -19,6 +20,11 @@ Task::Task(std::string const& name)
 Task::~Task()
 {
 }
+
+
+
+
+
 
 /// The following lines are template definitions for the various state machine
 // hooks defined by Orocos::RTT. See Task.hpp for more detailed
@@ -134,7 +140,9 @@ void Task::configureOutputs(GstElement* pipeline) {
             appsink,
             "new-sample", G_CALLBACK(sinkNewSample), &mConfiguredOutputs.back()
         );
+        mTimestamper = aggregator::TimestampEstimator(outputConfig.window,outputConfig.estimate,outputConfig.sample_loss_threshold);
     }
+
 }
 
 bool Task::startHook()
@@ -168,6 +176,10 @@ bool Task::startHook()
     if (ret == GST_STATE_CHANGE_FAILURE) {
         throw std::runtime_error("pipeline failed to start");
     }
+    // Resetting the timestamper estimator.
+    mTimestamper.reset();
+
+    TaskBase::updateHook();
     return true;
 }
 
@@ -188,7 +200,16 @@ void Task::updateHook()
         }
     }
 
-    TaskBase::updateHook();
+    // Feeeding camera timestamps to the estimator
+    base::Time hw_time;
+    while (_hardware_timestamps.read(hw_time) == RTT::NewData)
+        mTimestamper.updateReference(hw_time);
+
+
+
+
+
+
 }
 
 void Task::errorHook()
@@ -335,7 +356,10 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
     frame->init(width, height, 8, data->frameMode);
 
     frame->time = base::Time::now();
+    data->mTimestamper.update(frame->time);
     frame->frame_status = STATUS_VALID;
+
+
 
     uint8_t* pixels = &(frame->image[0]);
     if (frame->getNumberOfBytes() > mapInfo.size) {

@@ -4,6 +4,7 @@
 #define GSTREAMER_TASK_TASK_HPP
 
 #include "gstreamer/TaskBase.hpp"
+#include "aggregator/TimestampEstimator.hpp"
 
 #include <gst/app/gstappsink.h>
 #include <gst/app/gstappsrc.h>
@@ -32,6 +33,8 @@ namespace gstreamer {
 
         typedef base::samples::frame::frame_mode_t FrameMode;
 
+
+
         RTT::os::Mutex mSync;
 
         template<typename Port>
@@ -58,7 +61,11 @@ namespace gstreamer {
 
             ConfiguredInput(GstElement*, Task&, FrameInputPort*);
         };
-        typedef ConfiguredPort<FrameOutputPort> ConfiguredOutput;
+        struct ConfiguredOutput : ConfiguredPort<FrameOutputPort> {
+            aggregator::TimestampEstimator mTimestamper;
+
+            // ConfiguredOutput(Task&, FrameOutputPort*&, const base::samples::frame::frame_mode_t&);
+        };
 
         static GstFlowReturn sourcePushSample(GstElement *sink, ConfiguredOutput **data);
         static GstFlowReturn sinkNewSample(GstElement *sink, ConfiguredOutput *data);
@@ -76,6 +83,10 @@ namespace gstreamer {
         bool processInputs();
         bool pushFrame(GstElement* appsrc, GstVideoInfo& info, Frame const& image);
         void queueError(std::string const& message);
+
+        aggregator::TimestampEstimator mTimestamper;
+
+
 
     public:
         /** TaskContext constructor for Task
@@ -149,6 +160,7 @@ namespace gstreamer {
          */
         void cleanupHook();
     };
+
 }
 
 #endif
