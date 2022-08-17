@@ -26,8 +26,8 @@ namespace gstreamer {
         base::samples::frame::frame_mode_t frame_mode = base::samples::frame::MODE_RGB;
 
         base::Time window = base::Time::fromSeconds(5);
-        base::Time estimate = base::Time::fromMilliseconds(33);
-        int sample_loss_threshold = 2;        
+        base::Time period = base::Time::fromMilliseconds(0);
+        int sample_loss_threshold = 2;
     };
 }
 

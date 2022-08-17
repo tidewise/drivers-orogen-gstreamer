@@ -11,6 +11,11 @@ using namespace std;
 using namespace gstreamer;
 using namespace base::samples::frame;
 
+
+
+// If equal to 1, the timestamp estimator will be used. Set to any other value to deactivate it.
+const int Timestamp_Estimator_Activated = 1;
+
 Task::Task(std::string const& name)
     : TaskBase(name)
 {
@@ -135,16 +140,18 @@ void Task::configureOutputs(GstElement* pipeline) {
         auto timestamperStatusPort = new TimestamperStatusPort(timestamperStatuPortName);
         
         ConfiguredOutput configuredOutput(*this, timestamperStatusPort, port, outputConfig.frame_mode);
-        configuredOutput.mTimestamper = aggregator::TimestampEstimator(
-            outputConfig.window,
-            outputConfig.estimate,
-            outputConfig.sample_loss_threshold
-        );
+
 
         port->setDataSample(configuredOutput.frame);
         ports()->addPort(outputConfig.name, *port);
         ports()->addPort(timestamperStatuPortName, *timestamperStatusPort);
         mConfiguredOutputs.emplace_back(std::move(configuredOutput));
+
+        mConfiguredOutputs.back().mTimestamper = aggregator::TimestampEstimator(
+            outputConfig.window,
+            outputConfig.period,
+            outputConfig.sample_loss_threshold
+        );
 
         g_signal_connect(
             appsink,
@@ -356,7 +363,14 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
     std::unique_ptr<Frame> frame(data->frame.write_access());
     frame->init(width, height, 8, data->frameMode);
 
-    frame->time = data->mTimestamper.update(base::Time::now());
+    auto now = base::Time::now();
+    frame->received_time = now;
+    if (Timestamp_Estimator_Activated == 1){
+        frame->time = data->mTimestamper.update(now);
+    }else{
+        frame->time = now;
+       
+    }
     frame->frame_status = STATUS_VALID;
 
     uint8_t* pixels = &(frame->image[0]);
@@ -435,10 +449,9 @@ Task::ConfiguredOutput::ConfiguredOutput(
     , mTimestamperStatusPort(statusPort) {
 }
 Task::ConfiguredOutput::ConfiguredOutput(ConfiguredOutput&& src)
-//    : ConfiguredPort<Task::FrameOutputPort>(std::move(src))
-    : ConfiguredOutput(src.task, src.mTimestamperStatusPort, src.port, src.frameMode) {
-    frame.reset(src.frame.write_access());
-    src.port = nullptr;
+    : ConfiguredPort<Task::FrameOutputPort>(std::move(src))
+    , mTimestamper(src.mTimestamper)
+    , mTimestamperStatusPort(src.mTimestamperStatusPort) {
     src.mTimestamperStatusPort = nullptr;
 }
 Task::ConfiguredOutput::~ConfiguredOutput() {
