@@ -40,8 +40,15 @@ task_context "Task" do
     needs_configuration
     needs_global_initializer :gstreamer
 
+    # TimestampApproximator
+    output_port "timestamp_estimator_status",
+                "/aggregator/TimestampEstimatorStatus"
+
     # The GStreamer pipeline
     property "pipeline_initialization_timeout", "base/Time"
+
+    # Timestamp port
+    input_port "hardware_timestamps", "/base/Time"
 
     # The GStreamer pipeline
     property "pipeline", "string"
@@ -51,6 +58,9 @@ task_context "Task" do
 
     # Configuration of Rock output ports to be attached to the pipeline
     property "outputs", "/std/vector</gstreamer/OutputConfig>"
+
+    # Loss threshold for the timestamp estimator
+    property "sample_loss_threshold", "int", 2
 
     dynamic_input_port(/\w+/, ro_ptr("/base/samples/frame/Frame"))
     dynamic_output_port(/\w+/, ro_ptr("/base/samples/frame/Frame"))

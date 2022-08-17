@@ -135,10 +135,10 @@ void Task::configureOutputs(GstElement* pipeline) {
         );
 
         FrameOutputPort* port = new FrameOutputPort(outputConfig.name);
-        
+
         auto timestamperStatuPortName = outputConfig.name + "_timestamper_status";
         auto timestamperStatusPort = new TimestamperStatusPort(timestamperStatuPortName);
-        
+
         ConfiguredOutput configuredOutput(*this, timestamperStatusPort, port, outputConfig.frame_mode);
 
 
@@ -158,7 +158,9 @@ void Task::configureOutputs(GstElement* pipeline) {
              // !!! HERE: last argument must have the lifetime of the task
             "new-sample", G_CALLBACK(sinkNewSample), &mConfiguredOutputs.back()
         );
+        // mTimestamper = aggregator::TimestampEstimator(outputConfig.window,outputConfig.estimate,outputConfig.sample_loss_threshold);
     }
+
 }
 
 bool Task::startHook()
@@ -369,9 +371,11 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
         frame->time = data->mTimestamper.update(now);
     }else{
         frame->time = now;
-       
+
     }
     frame->frame_status = STATUS_VALID;
+
+
 
     uint8_t* pixels = &(frame->image[0]);
     if (frame->getNumberOfBytes() > mapInfo.size) {

@@ -5,7 +5,11 @@ using_task_library "gstreamer"
 task_m = OroGen.gstreamer.Task
 describe OroGen.gstreamer.Task do
     run_live
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 77b1fc32979f4b085fdca107b02353047c37aaa7
     it "attaches ports to source and sinks in the pipeline" do
         self.expect_execution_default_timeout = 600
 
@@ -14,12 +18,20 @@ describe OroGen.gstreamer.Task do
 
         sink_m = task_m.specialize
         sink_m.require_dynamic_service("image_sink", as: "in")
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 77b1fc32979f4b085fdca107b02353047c37aaa7
         cmp_m = Syskit::Composition.new_submodel
         cmp_m
             .add(source_m, as: "generator")
             .with_arguments(
+<<<<<<< HEAD
                 outputs: [{ name: "out", frame_mode: "MODE_RGB", window: Time.at(5), period: Time.at(1.0/30), sample_loss_threshold: 2 }],
+=======
+                outputs: [{ name: "out", frame_mode: "MODE_RGB" }],
+>>>>>>> 77b1fc32979f4b085fdca107b02353047c37aaa7
                 pipeline: <<~PIPELINE
                     videotestsrc pattern=colors ! queue ! videoconvert !
                         appsink name=out
@@ -41,7 +53,11 @@ describe OroGen.gstreamer.Task do
         cmp_m
             .add(source_m, as: "target")
             .with_arguments(
+<<<<<<< HEAD
                 outputs: [{ name: "out", frame_mode: "MODE_RGB", window: Time.at(5), period: Time.at(1.0/30), sample_loss_threshold: 2 }],
+=======
+                outputs: [{ name: "out", frame_mode: "MODE_RGB" }],
+>>>>>>> 77b1fc32979f4b085fdca107b02353047c37aaa7
                 pipeline: <<~PIPELINE
                     udpsrc port=9384 caps = "application/x-rtp, media=(string)video,
                         clock-rate=(int)90000, encoding-name=(string)RAW,
@@ -52,6 +68,7 @@ describe OroGen.gstreamer.Task do
             .prefer_deployed_tasks(/target/)
         cmp_m.generator_child.connect_to cmp_m.inverter_child
         cmp = syskit_deploy_configure_and_start(cmp_m)
+<<<<<<< HEAD
         sample_size = 100
         samples = expect_execution.to do
             [have_new_samples(cmp.generator_child.out_port, sample_size),
@@ -64,6 +81,25 @@ describe OroGen.gstreamer.Task do
         samples.each_with_index do |array, i|
             array.each_cons(2) do |a, b|
                 puts "#{i} T #{a.time.strftime("%H:%M:%s.%N")} #{b.time.strftime("%H:%M:%s.%N")} #{b.time - a.time}"
+=======
+        puts "3"
+        samples = expect_execution.to do
+            [have_new_samples(cmp.generator_child.out_port, 10),
+             have_new_samples(cmp.target_child.out_port, 10)]
+        end
+        puts "3"
+        expected = File.binread(File.join(__dir__, "videotestsrc_colors_320_240.bin"))
+        puts "4"
+        samples.each_with_index do |array, i|
+            array.each_cons(2) do |a, b|
+                puts "#{b.time - a.time} #{i}"
+            end
+        end
+        2.times do |i|
+            10.times do |j|
+                puts samples[i][j].time.tv_sec
+                puts samples[i][j].time.tv_usec
+>>>>>>> 77b1fc32979f4b085fdca107b02353047c37aaa7
             end
         end
     end
@@ -105,4 +141,8 @@ end
 
 Syskit.conf.use_deployment OroGen.gstreamer.Task => "generator"
 Syskit.conf.use_deployment OroGen.gstreamer.Task => "inverter"
+<<<<<<< HEAD
 Syskit.conf.use_deployment OroGen.gstreamer.Task => "target"
+=======
+Syskit.conf.use_deployment OroGen.gstreamer.Task => "target"
+>>>>>>> 77b1fc32979f4b085fdca107b02353047c37aaa7
