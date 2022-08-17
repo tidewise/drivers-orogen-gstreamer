@@ -4,7 +4,6 @@
 #define GSTREAMER_TASK_TASK_HPP
 
 #include "gstreamer/TaskBase.hpp"
-#include "aggregator/TimestampEstimator.hpp"
 
 #include <gst/app/gstappsink.h>
 #include <gst/app/gstappsrc.h>
@@ -30,11 +29,8 @@ namespace gstreamer {
         typedef RTT::extras::ReadOnlyPointer<Frame> ROPtrFrame;
         typedef RTT::InputPort<ROPtrFrame> FrameInputPort;
         typedef RTT::OutputPort<ROPtrFrame> FrameOutputPort;
-        typedef RTT::OutputPort<aggregator::TimestampEstimatorStatus> TimestamperStatusPort;
 
         typedef base::samples::frame::frame_mode_t FrameMode;
-
-
 
         RTT::os::Mutex mSync;
 
@@ -62,17 +58,7 @@ namespace gstreamer {
 
             ConfiguredInput(GstElement*, Task&, FrameInputPort*);
         };
-        struct ConfiguredOutput : ConfiguredPort<FrameOutputPort> {
-            aggregator::TimestampEstimator mTimestamper;
-            TimestamperStatusPort* mTimestamperStatusPort;
-
-            ConfiguredOutput(
-                Task&, TimestamperStatusPort*, FrameOutputPort*,
-                FrameMode frameMode = base::samples::frame::MODE_UNDEFINED
-            );
-            ConfiguredOutput(ConfiguredOutput&&);
-            ~ConfiguredOutput();
-        };
+        typedef ConfiguredPort<FrameOutputPort> ConfiguredOutput;
 
         static GstFlowReturn sourcePushSample(GstElement *sink, ConfiguredOutput **data);
         static GstFlowReturn sinkNewSample(GstElement *sink, ConfiguredOutput *data);
@@ -91,7 +77,7 @@ namespace gstreamer {
         bool pushFrame(GstElement* appsrc, GstVideoInfo& info, Frame const& image);
         void queueError(std::string const& message);
 
-     public:
+    public:
         /** TaskContext constructor for Task
          * \param name Name of the task. This name needs to be unique to make
          *             it identifiable via nameservices.
@@ -163,7 +149,6 @@ namespace gstreamer {
          */
         void cleanupHook();
     };
-
 }
 
 #endif
