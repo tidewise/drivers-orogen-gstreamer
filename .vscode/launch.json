@@ -10,6 +10,13 @@
             "name": "(drivers/orogen/gstreamer) ball_source",
             "deploy": "gstreamer::Task",
             "deployAs": "ball_source"
-        }
+        },
+        {
+            "type": "orogen",
+            "request": "launch",
+            "name": "(drivers/orogen/gstreamer) unit test - generator",
+            "deploy": "gstreamer::Task",
+            "deployAs": "generator"
+        },
     ]
 }
