@@ -1,3 +1,4 @@
+
 /* Generated from orogen/lib/orogen/templates/tasks/Task.hpp */
 
 #ifndef GSTREAMER_TASK_TASK_HPP
@@ -64,7 +65,8 @@ namespace gstreamer {
         };
         struct ConfiguredOutput : ConfiguredPort<FrameOutputPort> {
             aggregator::TimestampEstimator mTimestamper;
-            TimestamperStatusPort* mTimestamperStatusPort;
+            TimestamperStatusPort* mTimestamperStatusPort = nullptr;
+            bool mTimestamperActivated = true;
 
             ConfiguredOutput(
                 Task&, TimestamperStatusPort*, FrameOutputPort*,

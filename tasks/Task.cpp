@@ -12,10 +12,6 @@ using namespace gstreamer;
 using namespace base::samples::frame;
 
 
-
-// If equal to 1, the timestamp estimator will be used. Set to any other value to deactivate it.
-const int Timestamp_Estimator_Activated = 1;
-
 Task::Task(std::string const& name)
     : TaskBase(name)
 {
@@ -140,27 +136,26 @@ void Task::configureOutputs(GstElement* pipeline) {
         auto timestamperStatusPort = new TimestamperStatusPort(timestamperStatuPortName);
 
         ConfiguredOutput configuredOutput(*this, timestamperStatusPort, port, outputConfig.frame_mode);
-
-
         port->setDataSample(configuredOutput.frame);
         ports()->addPort(outputConfig.name, *port);
         ports()->addPort(timestamperStatuPortName, *timestamperStatusPort);
+        configuredOutput.mTimestamperActivated = !outputConfig.period.isNull();
         mConfiguredOutputs.emplace_back(std::move(configuredOutput));
 
-        mConfiguredOutputs.back().mTimestamper = aggregator::TimestampEstimator(
-            outputConfig.window,
-            outputConfig.period,
-            outputConfig.sample_loss_threshold
-        );
+        if (configuredOutput.mTimestamperActivated) {
+            mConfiguredOutputs.back().mTimestamper = aggregator::TimestampEstimator(
+                outputConfig.window,
+                outputConfig.period,
+                outputConfig.sample_loss_threshold
+            );
+        }
 
         g_signal_connect(
             appsink,
              // !!! HERE: last argument must have the lifetime of the task
             "new-sample", G_CALLBACK(sinkNewSample), &mConfiguredOutputs.back()
         );
-        // mTimestamper = aggregator::TimestampEstimator(outputConfig.window,outputConfig.estimate,outputConfig.sample_loss_threshold);
     }
-
 }
 
 bool Task::startHook()
@@ -195,8 +190,10 @@ bool Task::startHook()
         throw std::runtime_error("pipeline failed to start");
     }
     // Resetting the timestamper estimator.
-    for (auto& configuredOutput : mConfiguredOutputs){
-        configuredOutput.mTimestamper.reset();
+    for (auto& configuredOutput : mConfiguredOutputs) {
+        if (configuredOutput.mTimestamperActivated) {
+            configuredOutput.mTimestamper.reset();
+        }
     }
 
     return true;
@@ -367,12 +364,13 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
 
     auto now = base::Time::now();
     frame->received_time = now;
-    if (Timestamp_Estimator_Activated == 1){
+    if (data->mTimestamperActivated) {
         frame->time = data->mTimestamper.update(now);
-    }else{
+    } else {
         frame->time = now;
-
     }
+
+
     frame->frame_status = STATUS_VALID;
 
 
@@ -401,9 +399,11 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
     }
     data->frame.reset(frame.release());
     data->port->write(data->frame);
-    data->mTimestamperStatusPort->write(
-        data->mTimestamper.getStatus()
-    );
+
+    if (data->mTimestamperActivated) {
+        data->mTimestamperStatusPort->write(data->mTimestamper.getStatus());
+    }
+
     return GST_FLOW_OK;
 }
 
@@ -455,7 +455,8 @@ Task::ConfiguredOutput::ConfiguredOutput(
 Task::ConfiguredOutput::ConfiguredOutput(ConfiguredOutput&& src)
     : ConfiguredPort<Task::FrameOutputPort>(std::move(src))
     , mTimestamper(src.mTimestamper)
-    , mTimestamperStatusPort(src.mTimestamperStatusPort) {
+    , mTimestamperStatusPort(src.mTimestamperStatusPort)
+    , mTimestamperActivated(src.mTimestamperActivated) {
     src.mTimestamperStatusPort = nullptr;
 }
 Task::ConfiguredOutput::~ConfiguredOutput() {
