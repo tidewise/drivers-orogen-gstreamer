@@ -1,18 +1,22 @@
 #ifndef ROCK_GSTREAMER_HELPERS_HPP
 #define ROCK_GSTREAMER_HELPERS_HPP
 
+#include <gst/gstbuffer.h>
 #include <gst/gstobject.h>
 #include <gst/gstsample.h>
-#include <gst/gstbuffer.h>
 #include <gst/video/gstvideometa.h>
 
+#include <base/samples/Frame.hpp>
+
 namespace gstreamer {
-    template<typename T>
-    struct GstUnref;
-    #define ROCK_GSTREAMER_UNREF(GstStruct, gst_unref) \
-        template<> struct GstUnref<GstStruct> { \
-            static void unref(GstStruct* obj) { gst_unref(obj); } \
-        };
+    template <typename T> struct GstUnref;
+#define ROCK_GSTREAMER_UNREF(GstStruct, gst_unref)                                       \
+    template <> struct GstUnref<GstStruct> {                                             \
+        static void unref(GstStruct* obj)                                                \
+        {                                                                                \
+            gst_unref(obj);                                                              \
+        }                                                                                \
+    };
 
     ROCK_GSTREAMER_UNREF(GstElement, gst_object_unref);
     ROCK_GSTREAMER_UNREF(GstCaps, gst_caps_unref);
@@ -21,21 +25,24 @@ namespace gstreamer {
     ROCK_GSTREAMER_UNREF(GstMemory, gst_memory_unref);
     ROCK_GSTREAMER_UNREF(GstVideoFrame, gst_video_frame_unmap);
 
-    template<typename T>
-    struct GstUnrefGuard {
+    template <typename T> struct GstUnrefGuard {
         T* object;
         typedef void (*Unref)(T*);
         Unref unref = nullptr;
 
         explicit GstUnrefGuard(T* object, Unref unref = GstUnref<T>::unref)
             : object(object)
-            , unref(unref) {}
-        ~GstUnrefGuard() {
+            , unref(unref)
+        {
+        }
+        ~GstUnrefGuard()
+        {
             if (object) {
                 unref(object);
             }
         }
-        T* release() {
+        T* release()
+        {
             T* ret = object;
             object = nullptr;
             return ret;
@@ -46,12 +53,19 @@ namespace gstreamer {
         GstMemory* memory;
         GstMapInfo& mapInfo;
         GstMemoryUnmapGuard(GstMemory* memory, GstMapInfo& mapInfo)
-            : memory(memory), mapInfo(mapInfo) {}
-        ~GstMemoryUnmapGuard() { gst_memory_unmap(memory, &mapInfo); }
+            : memory(memory)
+            , mapInfo(mapInfo)
+        {
+        }
+        ~GstMemoryUnmapGuard()
+        {
+            gst_memory_unmap(memory, &mapInfo);
+        }
     };
 
-    static GstVideoFormat frameModeToGSTFormat(base::samples::frame::frame_mode_t format) {
-        switch(format) {
+    static GstVideoFormat frameModeToGSTFormat(base::samples::frame::frame_mode_t format)
+    {
+        switch (format) {
             case base::samples::frame::MODE_RGB:
                 return GST_VIDEO_FORMAT_RGB;
             case base::samples::frame::MODE_BGR:

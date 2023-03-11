@@ -1,10 +1,10 @@
 /* Generated from orogen/lib/orogen/templates/tasks/Task.cpp */
 
-#include <set>
 #include <gst/gstcaps.h>
+#include <set>
 
-#include "Task.hpp"
 #include "Helpers.hpp"
+#include "Task.hpp"
 
 using namespace std;
 using namespace gstreamer;
@@ -24,7 +24,8 @@ Task::~Task()
 // hooks defined by Orocos::RTT. See Task.hpp for more detailed
 // documentation about them.
 
-void Task::verifyNoNameCollision() {
+void Task::verifyNoNameCollision()
+{
     set<string> names;
     for (auto const& p : _outputs.get()) {
         if (!names.insert(p.name).second) {
@@ -35,9 +36,8 @@ void Task::verifyNoNameCollision() {
 
 bool Task::configureHook()
 {
-    if (! TaskBase::configureHook())
+    if (!TaskBase::configureHook())
         return false;
-
 
     verifyNoNameCollision();
     auto* pipeline = constructPipeline();
@@ -52,94 +52,81 @@ bool Task::configureHook()
     return true;
 }
 
-GstElement* Task::constructPipeline() {
-    GError *error = NULL;
-    gchar *descr = g_strdup(_pipeline.get().c_str());
+GstElement* Task::constructPipeline()
+{
+    GError* error = NULL;
+    gchar* descr = g_strdup(_pipeline.get().c_str());
 
     GstElement* element = gst_parse_launch(descr, &error);
     if (error != NULL) {
         string errorMessage = "could not construct pipeline: " + string(error->message);
-        g_clear_error (&error);
+        g_clear_error(&error);
         throw std::runtime_error(errorMessage);
     }
 
     return element;
 }
 
-void Task::configureInputs(GstElement* pipeline) {
+void Task::configureInputs(GstElement* pipeline)
+{
     auto config = _inputs.get();
     for (auto const& inputConfig : config) {
         GstElement* appsrc =
             gst_bin_get_by_name(GST_BIN(pipeline), inputConfig.name.c_str());
         if (!appsrc) {
             throw std::runtime_error(
-                "cannot find appsrc element named " + inputConfig.name +
-                "in pipeline"
-            );
+                "cannot find appsrc element named " + inputConfig.name + "in pipeline");
         }
         GstUnrefGuard<GstElement> refguard(appsrc);
-        g_object_set(
-            appsrc,
-            "is-live", TRUE,
-            NULL
-        );
+        g_object_set(appsrc, "is-live", TRUE, NULL);
 
         FrameInputPort* port = new FrameInputPort(inputConfig.name);
         ports()->addEventPort(inputConfig.name, *port);
-        mConfiguredInputs.emplace_back(
-            std::move(ConfiguredInput(appsrc, *this, port))
-        );
+        mConfiguredInputs.emplace_back(std::move(ConfiguredInput(appsrc, *this, port)));
     }
 }
 
-void Task::configureOutputs(GstElement* pipeline) {
+void Task::configureOutputs(GstElement* pipeline)
+{
     auto config = _outputs.get();
     for (auto const& outputConfig : config) {
         GstElement* appsink =
             gst_bin_get_by_name(GST_BIN(pipeline), outputConfig.name.c_str());
         if (!appsink) {
             throw std::runtime_error(
-                "cannot find appsink element named " + outputConfig.name +
-                "in pipeline"
-            );
+                "cannot find appsink element named " + outputConfig.name + "in pipeline");
         }
         GstUnrefGuard<GstElement> refguard(appsink);
 
         auto format = frameModeToGSTFormat(outputConfig.frame_mode);
-        GstCaps* caps = gst_caps_new_simple(
-            "video/x-raw",
-            "format", G_TYPE_STRING, gst_video_format_to_string(format),
-            NULL
-        );
+        GstCaps* caps = gst_caps_new_simple("video/x-raw",
+            "format",
+            G_TYPE_STRING,
+            gst_video_format_to_string(format),
+            NULL);
         if (!caps) {
             throw std::runtime_error("failed to generate caps");
         }
 
         GstUnrefGuard<GstCaps> caps_unref_guard(caps);
-        g_object_set(
-            appsink,
-            "emit-signals", TRUE,
-            "caps", caps,
-            NULL
-        );
+        g_object_set(appsink, "emit-signals", TRUE, "caps", caps, NULL);
 
         FrameOutputPort* port = new FrameOutputPort(outputConfig.name);
         ports()->addPort(outputConfig.name, *port);
         mConfiguredOutputs.emplace_back(
-            std::move(ConfiguredOutput(*this, port, outputConfig.frame_mode))
-        );
+            std::move(ConfiguredOutput(*this, port, outputConfig.frame_mode)));
 
         port->setDataSample(mConfiguredOutputs.back().frame);
-        g_signal_connect(
-            appsink,
-            "new-sample", G_CALLBACK(sinkNewSample), &mConfiguredOutputs.back()
-        );
+        g_signal_connect(appsink,
+            "new-sample",
+            G_CALLBACK(sinkNewSample),
+            &mConfiguredOutputs.back());
     }
 }
 
 bool Task::startHook()
 {
-    if (! TaskBase::startHook())
+    if (!TaskBase::startHook())
         return false;
 
     mErrorQueue.clear();
@@ -156,9 +143,7 @@ bool Task::startHook()
         }
 
         GstClockTime timeout_ns = 50000000ULL;
-        ret = gst_element_get_state(
-            GST_ELEMENT(mPipeline), NULL, NULL, timeout_ns
-        );
+        ret = gst_element_get_state(GST_ELEMENT(mPipeline), NULL, NULL, timeout_ns);
 
         if (!processInputs()) {
             return false;
@@ -171,7 +156,8 @@ bool Task::startHook()
     return true;
 }
 
-void Task::queueError(std::string const& message) {
+void Task::queueError(std::string const& message)
+{
     RTT::os::MutexLock lock(mSync);
     mErrorQueue.push_back(message);
 }
@@ -208,9 +194,10 @@ void Task::cleanupHook()
     TaskBase::cleanupHook();
 }
 
-void Task::waitFirstFrames(base::Time const& deadline) {
+void Task::waitFirstFrames(base::Time const& deadline)
+{
     bool all = false;
-    while(!all) {
+    while (!all) {
         all = true;
         for (auto& configuredInput : mConfiguredInputs) {
             if (configuredInput.port->read(configuredInput.frame, false) == RTT::NoData) {
@@ -230,29 +217,30 @@ void Task::waitFirstFrames(base::Time const& deadline) {
         configuredInput.height = configuredInput.frame->size.height;
 
         auto format = frameModeToGSTFormat(configuredInput.frameMode);
-        GstCaps* caps = gst_caps_new_simple(
-            "video/x-raw",
-            "format", G_TYPE_STRING, gst_video_format_to_string(format),
-            "width", G_TYPE_INT, configuredInput.width,
-            "height", G_TYPE_INT, configuredInput.height,
-            NULL
-        );
+        GstCaps* caps = gst_caps_new_simple("video/x-raw",
+            "format",
+            G_TYPE_STRING,
+            gst_video_format_to_string(format),
+            "width",
+            G_TYPE_INT,
+            configuredInput.width,
+            "height",
+            G_TYPE_INT,
+            configuredInput.height,
+            NULL);
         if (!caps) {
             throw std::runtime_error("failed to generate caps");
         }
         GstUnrefGuard<GstCaps> caps_unref_guard(caps);
-        g_object_set(
-            configuredInput.appsrc,
-            "caps", caps,
-            NULL
-        );
+        g_object_set(configuredInput.appsrc, "caps", caps, NULL);
 
         gst_video_info_from_caps(&configuredInput.info, caps);
         pushFrame(configuredInput.appsrc, configuredInput.info, *configuredInput.frame);
     }
 }
 
-bool Task::processInputs() {
+bool Task::processInputs()
+{
     for (auto& configuredInput : mConfiguredInputs) {
         while (configuredInput.port->read(configuredInput.frame, false) == RTT::NewData) {
             Frame const& frame = *configuredInput.frame;
@@ -263,7 +251,9 @@ bool Task::processInputs() {
                 return false;
             }
 
-            if (!pushFrame(configuredInput.appsrc, configuredInput.info, *configuredInput.frame)) {
+            if (!pushFrame(configuredInput.appsrc,
+                    configuredInput.info,
+                    *configuredInput.frame)) {
                 exception(GSTREAMER_ERROR);
                 return false;
             }
@@ -272,9 +262,10 @@ bool Task::processInputs() {
     return true;
 }
 
-bool Task::pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame) {
+bool Task::pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame)
+{
     /* Create a buffer to wrap the last received image */
-    GstBuffer *buffer = gst_buffer_new_and_alloc(info.size);
+    GstBuffer* buffer = gst_buffer_new_and_alloc(info.size);
     GstUnrefGuard<GstBuffer> unref_guard(buffer);
 
     int sourceStride = frame.getRowSize();
@@ -288,8 +279,8 @@ bool Task::pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame
         int rowSize = frame.getRowSize();
         for (int i = 0; i < info.height; ++i) {
             memcpy(pixels + i * targetStride,
-                   frame.image.data() + i * sourceStride,
-                   rowSize);
+                frame.image.data() + i * sourceStride,
+                rowSize);
         }
     }
     else {
@@ -302,14 +293,15 @@ bool Task::pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame
     return ret == GST_FLOW_OK;
 }
 
-GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data) {
+GstFlowReturn Task::sinkNewSample(GstElement* sink, Task::ConfiguredOutput* data)
+{
     /* Retrieve the buffer */
-    GstSample *sample = gst_app_sink_pull_sample(GST_APP_SINK(sink));
+    GstSample* sample = gst_app_sink_pull_sample(GST_APP_SINK(sink));
     GstUnrefGuard<GstSample> sample_unref_guard(sample);
 
     /* If we have a new sample we have to send it to our Rock frame */
-    GstBuffer *buffer = gst_sample_get_buffer (sample);
-    if (buffer == NULL){
+    GstBuffer* buffer = gst_sample_get_buffer(sample);
+    if (buffer == NULL) {
         return GST_FLOW_OK;
     }
 
@@ -322,7 +314,7 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
     int width = videoInfo.width;
     int height = videoInfo.height;
 
-    GstMemory *memory = gst_buffer_get_memory(buffer, 0);
+    GstMemory* memory = gst_buffer_get_memory(buffer, 0);
     GstUnrefGuard<GstMemory> memory_unref_guard(memory);
 
     GstMapInfo mapInfo;
@@ -342,8 +334,7 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
         data->task.queueError(
             "Inconsistent number of bytes. Rock's image type calculated " +
             to_string(frame->getNumberOfBytes()) + " while GStreamer only has " +
-            to_string(mapInfo.size)
-        );
+            to_string(mapInfo.size));
         return GST_FLOW_OK;
     }
 
@@ -352,8 +343,8 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
     if (sourceStride != targetStride) {
         for (int i = 0; i < height; ++i) {
             std::memcpy(pixels + targetStride * i,
-                        mapInfo.data + sourceStride * i,
-                        frame->getRowSize());
+                mapInfo.data + sourceStride * i,
+                frame->getRowSize());
         }
     }
     else {
@@ -364,11 +355,8 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
     return GST_FLOW_OK;
 }
 
-
-template<typename Port>
-Task::ConfiguredPort<Port>::ConfiguredPort(
-    Task& task, Port* port, FrameMode frameMode
-)
+template <typename Port>
+Task::ConfiguredPort<Port>::ConfiguredPort(Task& task, Port* port, FrameMode frameMode)
     : task(task)
     , port(port)
     , frameMode(frameMode)
@@ -378,26 +366,28 @@ Task::ConfiguredPort<Port>::ConfiguredPort(
     frame.reset(f);
 }
 
-template<typename Port>
+template <typename Port>
 Task::ConfiguredPort<Port>::ConfiguredPort(ConfiguredPort&& other)
     : task(other.task)
     , frame(other.frame.write_access())
     , port(other.port)
-    , frameMode(other.frameMode) {
+    , frameMode(other.frameMode)
+{
     other.port = nullptr;
 }
 
-template<typename Port>
-Task::ConfiguredPort<Port>::~ConfiguredPort() {
+template <typename Port> Task::ConfiguredPort<Port>::~ConfiguredPort()
+{
     if (port) {
         task.ports()->removePort(port->getName());
         delete port;
     }
 }
 
-Task::ConfiguredInput::ConfiguredInput(
-    GstElement* appsrc, Task& task, Task::FrameInputPort* port
-)
+Task::ConfiguredInput::ConfiguredInput(GstElement* appsrc,
+    Task& task,
+    Task::FrameInputPort* port)
     : ConfiguredPort<Task::FrameInputPort>(task, port)
-    , appsrc(appsrc) {
+    , appsrc(appsrc)
+{
 }
