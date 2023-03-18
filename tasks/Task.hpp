@@ -24,55 +24,11 @@ namespace gstreamer {
         friend class TaskBase;
 
     protected:
-        typedef base::samples::frame::Frame Frame;
-        typedef RTT::extras::ReadOnlyPointer<Frame> ROPtrFrame;
-        typedef RTT::InputPort<ROPtrFrame> FrameInputPort;
-        typedef RTT::OutputPort<ROPtrFrame> FrameOutputPort;
-
-        typedef base::samples::frame::frame_mode_t FrameMode;
-
-        RTT::os::Mutex mSync;
-
-        template <typename Port> struct ConfiguredPort {
-            Task& task;
-            ROPtrFrame frame;
-            Port* port;
-            FrameMode frameMode;
-
-            ConfiguredPort(Task&,
-                Port*,
-                FrameMode frameMode = base::samples::frame::MODE_UNDEFINED);
-            ConfiguredPort(ConfiguredPort const&) = delete;
-            ConfiguredPort(ConfiguredPort&&);
-            ~ConfiguredPort();
-        };
-
-        struct ConfiguredInput : ConfiguredPort<FrameInputPort> {
-            GstElement* appsrc = nullptr;
-            GstVideoInfo info;
-            uint32_t width = 0;
-            uint32_t height = 0;
-
-            ConfiguredInput(GstElement*, Task&, FrameInputPort*);
-        };
-        typedef ConfiguredPort<FrameOutputPort> ConfiguredOutput;
-
-        static GstFlowReturn sourcePushSample(GstElement* sink, ConfiguredOutput** data);
-        static GstFlowReturn sinkNewSample(GstElement* sink, ConfiguredOutput* data);
-        void verifyNoNameCollision();
         GstElement* constructPipeline();
 
-        GstElement* mPipeline = nullptr;
-        std::list<ConfiguredInput> mConfiguredInputs;
-        std::list<ConfiguredOutput> mConfiguredOutputs;
-        std::vector<std::string> mErrorQueue;
-
+        void verifyNoNameCollision();
         void configureInputs(GstElement* pipeline);
         void configureOutputs(GstElement* pipeline);
-        void waitFirstFrames(base::Time const& deadline);
-        bool processInputs();
-        bool pushFrame(GstElement* appsrc, GstVideoInfo& info, Frame const& image);
-        void queueError(std::string const& message);
 
     public:
         /** TaskContext constructor for Task

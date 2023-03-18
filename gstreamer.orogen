@@ -34,13 +34,19 @@ if defined?(OroGen::Gen::RTT_CPP::Deployment)
 end
 
 #
-task_context "Task" do
+task_context "Common" do
+    abstract
+
     needs_configuration
     needs_global_initializer :gstreamer
 
     # The GStreamer pipeline
     property "pipeline_initialization_timeout", "base/Time"
 
+    exception_states :INPUT_FRAME_CHANGED_PARAMETERS, :GSTREAMER_ERROR
+end
+
+task_context "Task", subclasses: "Common" do
     # The GStreamer pipeline
     property "pipeline", "string"
 
@@ -52,8 +58,6 @@ task_context "Task" do
 
     dynamic_input_port(/\w+/, ro_ptr("/base/samples/frame/Frame"))
     dynamic_output_port(/\w+/, ro_ptr("/base/samples/frame/Frame"))
-
-    exception_states :INPUT_FRAME_CHANGED_PARAMETERS, :GSTREAMER_ERROR
 
     port_driven
 end
