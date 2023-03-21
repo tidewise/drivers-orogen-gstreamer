@@ -1,17 +1,13 @@
 /* Generated from orogen/lib/orogen/templates/tasks/Task.hpp */
 
-#ifndef GSTREAMER_WEBRTCCOMMONTASK_TASK_HPP
-#define GSTREAMER_WEBRTCCOMMONTASK_TASK_HPP
+#ifndef GSTREAMER_WEBRTCSENDTASK_TASK_HPP
+#define GSTREAMER_WEBRTCSENDTASK_TASK_HPP
 
-#include "gstreamer/WebRTCCommonTaskBase.hpp"
-
-#include <gst/gst.h>
-
-#define GST_USE_UNSTABLE_API
-#include <gst/webrtc/webrtc.h>
+#include "gstreamer/WebRTCSendTaskBase.hpp"
 
 namespace gstreamer {
-    /*! \class WebRTCCommonTask
+
+    /*! \class WebRTCSendTask
      * \brief The task context provides and requires services. It uses an ExecutionEngine
      to perform its functions.
      * Essential interfaces are operations, data flow ports and properties. These
@@ -23,62 +19,31 @@ namespace gstreamer {
      * The name of a TaskContext is primarily defined via:
      \verbatim
      deployment 'deployment_name'
-         task('custom_task_name','gstreamer::WebRTCCommonTask')
+         task('custom_task_name','gstreamer::WebRTCSendTask')
      end
      \endverbatim
      *  It can be dynamically adapted when the deployment is called with a prefix
      argument.
      */
-    class WebRTCCommonTask : public WebRTCCommonTaskBase {
-        friend class WebRTCCommonTaskBase;
+    class WebRTCSendTask : public WebRTCSendTaskBase {
+        friend class WebRTCSendTaskBase;
 
     protected:
-        struct Peer {
-            std::string peer_id;
-            GstElement* webrtcbin = nullptr;
-            WebRTCCommonTask* task = nullptr;
-        };
-
-        typedef std::map<GstElement*, Peer> PeerMap;
-        PeerMap m_peers;
-        PeerMap::iterator findPeerByID(std::string const& peer_id);
-
-        SignallingConfig m_signalling_config;
-
-        void destroyPipeline() override;
-        void configureWebRTCBin(std::string const& peer_id, GstElement* webrtcbin);
-
-        void onNegotiationNeeded(GstElement* webrtcbin);
-        static void callbackNegotiationNeeded(GstElement* promise, void* user_data);
-
-        void onOfferCreated(Peer const& peer, GstWebRTCSessionDescription& offer);
-        static void callbackOfferCreated(GstPromise* promise, void* user_data);
-
-        void onICECandidate(Peer const& peer, guint mline_index, std::string candidate);
-        static void callbackICECandidate(GstElement* element,
-            unsigned int mline_index,
-            char* candidate,
-            void* user_data);
-
-        void processICECandidate(GstElement* webrtcbin,
-            webrtc_base::SignallingMessage const& msg);
-        void processRemoteDescription(GstElement* webrtcbin,
-            webrtc_base::SignallingMessage const& msg);
-
-        void processSignallingMessage(GstElement* webrtcbin,
-            webrtc_base::SignallingMessage const& msg);
+        GstElement* createPipeline();
+        void disconnectPeer(PeerMap::iterator peer_it);
+        void configurePeer(std::string const& peer_id);
 
     public:
-        /** TaskContext constructor for WebRTCCommonTask
+        /** TaskContext constructor for WebRTCSendTask
          * \param name Name of the task. This name needs to be unique to make it
-         * identifiable via nameservices. \param initial_state The initial TaskState of
-         * the TaskContext. Default is Stopped state.
+         * identifiable via nameservices. \param initial_state The initial TaskState
+         * of the TaskContext. Default is Stopped state.
          */
-        WebRTCCommonTask(std::string const& name = "gstreamer::WebRTCCommonTask");
+        WebRTCSendTask(std::string const& name = "gstreamer::WebRTCSendTask");
 
-        /** Default deconstructor of WebRTCCommonTask
+        /** Default deconstructor of WebRTCSendTask
          */
-        ~WebRTCCommonTask();
+        ~WebRTCSendTask();
 
         /** This hook is called by Orocos when the state machine transitions
          * from PreOperational to Stopped. If it returns false, then the

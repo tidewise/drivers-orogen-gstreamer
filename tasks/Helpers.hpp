@@ -41,6 +41,10 @@ namespace gstreamer {
                 unref(object);
             }
         }
+        T* get()
+        {
+            return object;
+        }
         T* release()
         {
             T* ret = object;

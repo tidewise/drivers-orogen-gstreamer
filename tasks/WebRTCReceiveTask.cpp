@@ -40,9 +40,11 @@ bool WebRTCReceiveTask::startHook()
     auto config = _signalling_config.get();
     if (!config.polite && !config.remote_peer_id.empty()) {
         mPipeline = createPipeline(config.remote_peer_id);
+        startPipeline();
     }
     else if (config.polite) {
         mPipeline = createPipeline();
+        startPipeline();
     }
 
     return true;
@@ -73,6 +75,7 @@ void WebRTCReceiveTask::updateHook()
                 destroyPipeline();
             }
             mPipeline = createPipeline(message.peer_id);
+            continue;
         }
         else if (message.type == SIGNALLING_OFFER) {
             auto sig_config = _signalling_config.get();

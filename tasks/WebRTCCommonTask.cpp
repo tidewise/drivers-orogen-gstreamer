@@ -203,3 +203,13 @@ void WebRTCCommonTask::destroyPipeline()
 
     m_peers.clear();
 }
+
+WebRTCCommonTask::PeerMap::iterator WebRTCCommonTask::findPeerByID(
+    std::string const& peer_id)
+{
+    return find_if(m_peers.begin(),
+        m_peers.end(),
+        [peer_id](std::pair<GstElement*, Peer> const& v) {
+            return v.second.peer_id == peer_id;
+        });
+}
