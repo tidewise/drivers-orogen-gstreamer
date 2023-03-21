@@ -6,6 +6,7 @@
   <depend package="base/cmake" />
   <depend package="base/orogen/types" />
   <depend package="gstreamer" />
+  <depend package="drivers/orogen/webrtc_base" />
 
   <test_depend package="tools/syskit" />
 </package>

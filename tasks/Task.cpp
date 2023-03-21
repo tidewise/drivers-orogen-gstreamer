@@ -87,7 +87,11 @@ void Task::configureOutputs(GstElement* pipeline)
     auto config = _outputs.get();
     for (auto const& outputConfig : config) {
         unique_ptr<FrameOutputPort> port(new FrameOutputPort(outputConfig.name));
-        configureOutput(pipeline, outputConfig, true, *port);
+        configureOutput(pipeline,
+            outputConfig.name,
+            outputConfig.frame_mode,
+            true,
+            *port);
         ports()->addPort(outputConfig.name, *port);
         port.release();
     }

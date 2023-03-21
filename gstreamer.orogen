@@ -5,10 +5,12 @@ name "gstreamer"
 using_library "base-logging", typekit: false
 using_library "gstreamer-video-1.0", typekit: false
 using_library "gstreamer-app-1.0", typekit: false
+using_library "gstreamer-webrtc-1.0", typekit: false
 
 import_types_from "gstreamerTypes.hpp"
 import_types_from "std"
 import_types_from "base"
+import_types_from "webrtc_base"
 
 OroGen::Spec::Deployment.register_global_initializer(:gstreamer)
 if defined?(OroGen::Gen::RTT_CPP::Deployment)
@@ -33,7 +35,6 @@ if defined?(OroGen::Gen::RTT_CPP::Deployment)
     )
 end
 
-#
 task_context "Common" do
     abstract
 
@@ -60,4 +61,18 @@ task_context "Task", subclasses: "Common" do
     dynamic_output_port(/\w+/, ro_ptr("/base/samples/frame/Frame"))
 
     port_driven
+end
+
+task_context "WebRTCCommonTask", subclasses: "Common" do
+    property "signalling_config", "/gstreamer/SignallingConfig"
+
+    input_port("signalling_in", "/webrtc_base/SignallingMessage")
+        .needs_reliable_connection
+
+    output_port "signalling_out", "/webrtc_base/SignallingMessage"
+end
+
+task_context "WebRTCReceiveTask", subclasses: "WebRTCCommonTask" do
+    property "frame_mode", "/base/samples/frame/frame_mode_t"
+    output_port "video_out", ro_ptr("/base/samples/frame/Frame")
 end

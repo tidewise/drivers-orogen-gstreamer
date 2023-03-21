@@ -1,20 +1,14 @@
 /* Generated from orogen/lib/orogen/templates/tasks/Task.hpp */
 
-#ifndef GSTREAMER_COMMON_TASK_HPP
-#define GSTREAMER_COMMON_TASK_HPP
+#ifndef GSTREAMER_WEBRTCRECEIVETASK_TASK_HPP
+#define GSTREAMER_WEBRTCRECEIVETASK_TASK_HPP
 
-#include "gstreamer/CommonBase.hpp"
-#include <base/samples/Frame.hpp>
-#include <rtt/extras/ReadOnlyPointer.hpp>
-
-#include <gst/app/gstappsink.h>
-#include <gst/app/gstappsrc.h>
-#include <gst/video/video-info.h>
-
-#include "gstreamer/gstreamerTypes.hpp"
+#include "gstreamer/WebRTCReceiveTaskBase.hpp"
+#include <gst/gst.h>
 
 namespace gstreamer {
-    /*! \class Common
+
+    /*! \class WebRTCReceiveTask
      * \brief The task context provides and requires services. It uses an ExecutionEngine
      to perform its functions.
      * Essential interfaces are operations, data flow ports and properties. These
@@ -26,87 +20,39 @@ namespace gstreamer {
      * The name of a TaskContext is primarily defined via:
      \verbatim
      deployment 'deployment_name'
-         task('custom_task_name','gstreamer::Common')
+         task('custom_task_name','gstreamer::WebRTCReceiveTask')
      end
      \endverbatim
      *  It can be dynamically adapted when the deployment is called with a prefix
      argument.
      */
-    class Common : public CommonBase {
-        friend class CommonBase;
-
-        RTT::os::Mutex mSync;
-        std::vector<std::string> mErrorQueue;
+    class WebRTCReceiveTask : public WebRTCReceiveTaskBase {
+        friend class WebRTCReceiveTaskBase;
 
     protected:
-        typedef base::samples::frame::Frame Frame;
-        typedef RTT::extras::ReadOnlyPointer<Frame> ROPtrFrame;
-        typedef RTT::InputPort<ROPtrFrame> FrameInputPort;
-        typedef RTT::OutputPort<ROPtrFrame> FrameOutputPort;
+        GstElement* createPipeline(std::string const& peer_id = "");
 
-        typedef base::samples::frame::frame_mode_t FrameMode;
+        static void callbackIncomingStream(GstElement* webrtcbin,
+            GstPad* pad,
+            WebRTCReceiveTask* task);
+        void onIncomingStream(GstElement* webrtcbin, GstPad* pad);
 
-        template <typename Port> struct ConfiguredPort {
-            bool dynamic;
-            Common& task;
-            ROPtrFrame frame;
-            Port* port;
-            FrameMode frameMode;
-
-            ConfiguredPort(bool dynamic,
-                Common&,
-                Port*,
-                FrameMode frameMode = base::samples::frame::MODE_UNDEFINED);
-            ConfiguredPort(ConfiguredPort const&) = delete;
-            ConfiguredPort(ConfiguredPort&&);
-            ~ConfiguredPort();
-        };
-
-        struct ConfiguredInput : ConfiguredPort<FrameInputPort> {
-            GstElement* appsrc = nullptr;
-            GstVideoInfo info;
-            uint32_t width = 0;
-            uint32_t height = 0;
-
-            ConfiguredInput(bool dynamic, GstElement*, Common&, FrameInputPort*);
-        };
-        typedef ConfiguredPort<FrameOutputPort> ConfiguredOutput;
-
-        std::list<ConfiguredInput> mConfiguredInputs;
-        std::list<ConfiguredOutput> mConfiguredOutputs;
-
-        GstElement* mPipeline = nullptr;
-
-        void configureOutput(GstElement* pipeline,
-            std::string const& appsink_name,
-            base::samples::frame::frame_mode_t frame_mode,
-            bool dynamic,
-            FrameOutputPort& port);
-        void configureInput(GstElement* pipeline,
-            InputConfig const& config,
-            bool dynamic,
-            FrameInputPort& port);
-        void waitFirstFrames(base::Time const& deadline);
-        void queueError(std::string const& message);
-        bool startPipeline();
-        virtual void destroyPipeline();
-
-        static GstFlowReturn sourcePushSample(GstElement* sink, ConfiguredOutput** data);
-        static GstFlowReturn sinkNewSample(GstElement* sink, ConfiguredOutput* data);
-        bool processInputs();
-        bool pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
+        static void callbackIncomingDecodebinStream(GstElement* webrtcbin,
+            GstPad* pad,
+            WebRTCReceiveTask* task);
+        void handleVideoStream(GstElement* bin, GstPad* pad);
 
     public:
-        /** TaskContext constructor for Common
+        /** TaskContext constructor for WebRTCReceiveTask
          * \param name Name of the task. This name needs to be unique to make it
          * identifiable via nameservices. \param initial_state The initial TaskState of
          * the TaskContext. Default is Stopped state.
          */
-        Common(std::string const& name = "gstreamer::Common");
+        WebRTCReceiveTask(std::string const& name = "gstreamer::WebRTCReceiveTask");
 
-        /** Default deconstructor of Common
+        /** Default deconstructor of WebRTCReceiveTask
          */
-        ~Common();
+        ~WebRTCReceiveTask();
 
         /** This hook is called by Orocos when the state machine transitions
          * from PreOperational to Stopped. If it returns false, then the

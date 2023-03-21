@@ -1,20 +1,17 @@
 /* Generated from orogen/lib/orogen/templates/tasks/Task.hpp */
 
-#ifndef GSTREAMER_COMMON_TASK_HPP
-#define GSTREAMER_COMMON_TASK_HPP
+#ifndef GSTREAMER_WEBRTCCOMMONTASK_TASK_HPP
+#define GSTREAMER_WEBRTCCOMMONTASK_TASK_HPP
 
-#include "gstreamer/CommonBase.hpp"
-#include <base/samples/Frame.hpp>
-#include <rtt/extras/ReadOnlyPointer.hpp>
+#include "gstreamer/WebRTCCommonTaskBase.hpp"
 
-#include <gst/app/gstappsink.h>
-#include <gst/app/gstappsrc.h>
-#include <gst/video/video-info.h>
+#include <gst/gst.h>
 
-#include "gstreamer/gstreamerTypes.hpp"
+#define GST_USE_UNSTABLE_API
+#include <gst/webrtc/webrtc.h>
 
 namespace gstreamer {
-    /*! \class Common
+    /*! \class WebRTCCommonTask
      * \brief The task context provides and requires services. It uses an ExecutionEngine
      to perform its functions.
      * Essential interfaces are operations, data flow ports and properties. These
@@ -26,87 +23,59 @@ namespace gstreamer {
      * The name of a TaskContext is primarily defined via:
      \verbatim
      deployment 'deployment_name'
-         task('custom_task_name','gstreamer::Common')
+         task('custom_task_name','gstreamer::WebRTCCommonTask')
      end
      \endverbatim
      *  It can be dynamically adapted when the deployment is called with a prefix
      argument.
      */
-    class Common : public CommonBase {
-        friend class CommonBase;
-
-        RTT::os::Mutex mSync;
-        std::vector<std::string> mErrorQueue;
+    class WebRTCCommonTask : public WebRTCCommonTaskBase {
+        friend class WebRTCCommonTaskBase;
 
     protected:
-        typedef base::samples::frame::Frame Frame;
-        typedef RTT::extras::ReadOnlyPointer<Frame> ROPtrFrame;
-        typedef RTT::InputPort<ROPtrFrame> FrameInputPort;
-        typedef RTT::OutputPort<ROPtrFrame> FrameOutputPort;
-
-        typedef base::samples::frame::frame_mode_t FrameMode;
-
-        template <typename Port> struct ConfiguredPort {
-            bool dynamic;
-            Common& task;
-            ROPtrFrame frame;
-            Port* port;
-            FrameMode frameMode;
-
-            ConfiguredPort(bool dynamic,
-                Common&,
-                Port*,
-                FrameMode frameMode = base::samples::frame::MODE_UNDEFINED);
-            ConfiguredPort(ConfiguredPort const&) = delete;
-            ConfiguredPort(ConfiguredPort&&);
-            ~ConfiguredPort();
+        struct Peer {
+            std::string peer_id;
+            GstElement* webrtcbin = nullptr;
+            WebRTCCommonTask* task = nullptr;
         };
 
-        struct ConfiguredInput : ConfiguredPort<FrameInputPort> {
-            GstElement* appsrc = nullptr;
-            GstVideoInfo info;
-            uint32_t width = 0;
-            uint32_t height = 0;
+        std::map<GstElement*, Peer> m_peers;
+        SignallingConfig m_signalling_config;
 
-            ConfiguredInput(bool dynamic, GstElement*, Common&, FrameInputPort*);
-        };
-        typedef ConfiguredPort<FrameOutputPort> ConfiguredOutput;
+        void destroyPipeline() override;
+        void configureWebRTCBin(std::string const& peer_id, GstElement* webrtcbin);
 
-        std::list<ConfiguredInput> mConfiguredInputs;
-        std::list<ConfiguredOutput> mConfiguredOutputs;
+        void onNegotiationNeeded(GstElement* webrtcbin);
+        static void callbackNegotiationNeeded(GstElement* promise, void* user_data);
 
-        GstElement* mPipeline = nullptr;
+        void onOfferCreated(Peer const& peer, GstWebRTCSessionDescription& offer);
+        static void callbackOfferCreated(GstPromise* promise, void* user_data);
 
-        void configureOutput(GstElement* pipeline,
-            std::string const& appsink_name,
-            base::samples::frame::frame_mode_t frame_mode,
-            bool dynamic,
-            FrameOutputPort& port);
-        void configureInput(GstElement* pipeline,
-            InputConfig const& config,
-            bool dynamic,
-            FrameInputPort& port);
-        void waitFirstFrames(base::Time const& deadline);
-        void queueError(std::string const& message);
-        bool startPipeline();
-        virtual void destroyPipeline();
+        void onICECandidate(Peer const& peer, guint mline_index, std::string candidate);
+        static void callbackICECandidate(GstElement* element,
+            unsigned int mline_index,
+            char* candidate,
+            void* user_data);
 
-        static GstFlowReturn sourcePushSample(GstElement* sink, ConfiguredOutput** data);
-        static GstFlowReturn sinkNewSample(GstElement* sink, ConfiguredOutput* data);
-        bool processInputs();
-        bool pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
+        void processICECandidate(GstElement* webrtcbin,
+            webrtc_base::SignallingMessage const& msg);
+        void processRemoteDescription(GstElement* webrtcbin,
+            webrtc_base::SignallingMessage const& msg);
+
+        void processSignallingMessage(GstElement* webrtcbin,
+            webrtc_base::SignallingMessage const& msg);
 
     public:
-        /** TaskContext constructor for Common
+        /** TaskContext constructor for WebRTCCommonTask
          * \param name Name of the task. This name needs to be unique to make it
          * identifiable via nameservices. \param initial_state The initial TaskState of
          * the TaskContext. Default is Stopped state.
          */
-        Common(std::string const& name = "gstreamer::Common");
+        WebRTCCommonTask(std::string const& name = "gstreamer::WebRTCCommonTask");
 
-        /** Default deconstructor of Common
+        /** Default deconstructor of WebRTCCommonTask
          */
-        ~Common();
+        ~WebRTCCommonTask();
 
         /** This hook is called by Orocos when the state machine transitions
          * from PreOperational to Stopped. If it returns false, then the

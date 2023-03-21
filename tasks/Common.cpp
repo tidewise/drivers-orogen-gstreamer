@@ -54,16 +54,23 @@ void Common::errorHook()
 }
 void Common::stopHook()
 {
-    gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PAUSED);
     CommonBase::stopHook();
+    gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PAUSED);
 }
 void Common::cleanupHook()
 {
+    CommonBase::cleanupHook();
+
+    destroyPipeline();
+}
+
+void Common::destroyPipeline()
+{
     gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_NULL);
     gst_object_unref(mPipeline);
+    mPipeline = nullptr;
     mConfiguredInputs.clear();
     mConfiguredOutputs.clear();
-    CommonBase::cleanupHook();
 }
 
 bool Common::startPipeline()
@@ -96,18 +103,19 @@ bool Common::startPipeline()
 }
 
 void Common::configureOutput(GstElement* pipeline,
-    OutputConfig const& config,
+    std::string const& appsink_name,
+    base::samples::frame::frame_mode_t frame_mode,
     bool dynamic,
     FrameOutputPort& port)
 {
-    GstElement* appsink = gst_bin_get_by_name(GST_BIN(pipeline), config.name.c_str());
+    GstElement* appsink = gst_bin_get_by_name(GST_BIN(pipeline), appsink_name.c_str());
     if (!appsink) {
         throw std::runtime_error(
-            "cannot find appsink element named " + config.name + "in pipeline");
+            "cannot find appsink element named " + appsink_name + "in pipeline");
     }
     GstUnrefGuard<GstElement> refguard(appsink);
 
-    auto format = rawModeToGSTVideoFormat(config.frame_mode);
+    auto format = rawModeToGSTVideoFormat(frame_mode);
     GstCaps* caps = gst_caps_new_simple("video/x-raw",
         "format",
         G_TYPE_STRING,
@@ -121,7 +129,7 @@ void Common::configureOutput(GstElement* pipeline,
     g_object_set(appsink, "emit-signals", TRUE, "caps", caps, NULL);
 
     mConfiguredOutputs.emplace_back(
-        std::move(ConfiguredOutput(dynamic, *this, &port, config.frame_mode)));
+        std::move(ConfiguredOutput(dynamic, *this, &port, frame_mode)));
 
     port.setDataSample(mConfiguredOutputs.back().frame);
     g_signal_connect(appsink,
