@@ -137,6 +137,12 @@ void WebRTCSendTask::configurePeer(string const& peer_id)
     GstUnrefGuard<GstPad> srcpad(gst_element_get_request_pad(splitter.get(), "src_%u"));
     GstUnrefGuard<GstPad> sinkpad(gst_element_get_static_pad(queue, "sink"));
     gst_pad_link(srcpad.get(), sinkpad.get());
+    m_tee_pads[bin] = srcpad.get();
+
+    auto& peer = m_peers[bin];
+    peer.peer_id = peer_id;
+    peer.task = this;
+    peer.webrtcbin = bin;
 }
 
 void WebRTCSendTask::disconnectPeer(PeerMap::iterator peer_it)
@@ -153,4 +159,8 @@ void WebRTCSendTask::disconnectPeer(PeerMap::iterator peer_it)
         gst_bin_get_by_name(GST_BIN(mPipeline), "splitter"));
     gst_element_unlink(splitter.get(), peer.webrtcbin);
     gst_bin_remove(GST_BIN(mPipeline), peer.webrtcbin);
+
+    auto it = m_tee_pads.find(peer.webrtcbin);
+    gst_element_release_request_pad(splitter.get(), it->second);
+    m_tee_pads.erase(it);
 }

@@ -33,6 +33,8 @@ namespace gstreamer {
         void disconnectPeer(PeerMap::iterator peer_it);
         void configurePeer(std::string const& peer_id);
 
+        std::map<GstElement*, GstPad*> m_tee_pads;
+
     public:
         /** TaskContext constructor for WebRTCSendTask
          * \param name Name of the task. This name needs to be unique to make it
