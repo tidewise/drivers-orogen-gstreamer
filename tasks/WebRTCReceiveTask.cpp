@@ -112,21 +112,17 @@ void WebRTCReceiveTask::cleanupHook()
 
 GstElement* WebRTCReceiveTask::createPipeline(string const& peer_id)
 {
-    GError* error;
-    GstElement* pipe = gst_parse_launch("webrtcbin name=webrtc", &error);
-
-    if (error) {
-        std::string msg(error->message);
-        g_error_free(error);
-        throw std::runtime_error("Failed to create pipeline: " + msg);
+    GstUnrefGuard<GstElement> pipe(gst_pipeline_new("receivepipe"));
+    GstElement* webrtc = gst_element_factory_make("webrtcbin", "webrtc");
+    if (!webrtc) {
+        throw std::runtime_error("could not resolve webrtc element in created pipeline");
     }
 
-    GstElement* webrtc = gst_bin_get_by_name(GST_BIN(pipe), "webrtc");
+    gst_bin_add(GST_BIN(pipe.get()), webrtc);
     configureWebRTCBin(peer_id, webrtc);
     g_signal_connect(webrtc, "pad-added", G_CALLBACK(callbackIncomingStream), this);
-    gst_object_unref(webrtc);
 
-    return pipe;
+    return pipe.release();
 
     // TODO: look into TWCC
 }
