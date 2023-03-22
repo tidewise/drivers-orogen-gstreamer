@@ -61,10 +61,12 @@ void WebRTCReceiveTask::updateHook()
             continue;
         }
 
+        LOG_INFO_S << "Signalling: " << message.type << " from " << message.from << ": "
+                   << message.message;
         auto sig_config = _signalling_config.get();
         if (!sig_config.remote_peer_id.empty() &&
-            sig_config.remote_peer_id != message.peer_id) {
-            LOG_ERROR_S << "Received signalling message from " + message.peer_id +
+            sig_config.remote_peer_id != message.from) {
+            LOG_ERROR_S << "Received signalling message from " + message.from +
                                " but this component is configured to establish "
                                "connection with " +
                                sig_config.remote_peer_id + " only";
@@ -80,7 +82,7 @@ void WebRTCReceiveTask::updateHook()
             if (mPipeline) {
                 destroyPipeline();
             }
-            mPipeline = createPipeline(message.peer_id);
+            mPipeline = createPipeline(message.from);
             continue;
         }
         else if (message.type == SIGNALLING_OFFER) {
@@ -90,7 +92,7 @@ void WebRTCReceiveTask::updateHook()
                 continue;
             }
 
-            m_peers.begin()->second.peer_id = message.peer_id;
+            m_peers.begin()->second.peer_id = message.from;
         }
 
         auto webrtcbin = m_peers.begin()->first;

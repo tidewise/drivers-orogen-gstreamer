@@ -46,10 +46,12 @@ void WebRTCSendTask::updateHook()
             continue;
         }
 
+        LOG_INFO_S << "Signalling: " << message.type << " from " << message.from << ": "
+                   << message.message;
         auto sig_config = _signalling_config.get();
         if (!sig_config.remote_peer_id.empty() &&
-            sig_config.remote_peer_id != message.peer_id) {
-            LOG_ERROR_S << "Received signalling message from " + message.peer_id +
+            sig_config.remote_peer_id != message.from) {
+            LOG_ERROR_S << "Received signalling message from " + message.from +
                                " but this component is configured to establish "
                                "connection with " +
                                sig_config.remote_peer_id + " only";
@@ -62,11 +64,11 @@ void WebRTCSendTask::updateHook()
                 continue;
             }
 
-            auto peer_it = findPeerByID(message.peer_id);
+            auto peer_it = findPeerByID(message.from);
             if (peer_it != m_peers.end()) {
                 disconnectPeer(peer_it);
             }
-            configurePeer(message.peer_id);
+            configurePeer(message.from);
             continue;
         }
         else if (message.type == SIGNALLING_OFFER) {
@@ -76,16 +78,16 @@ void WebRTCSendTask::updateHook()
                 continue;
             }
 
-            auto peer_it = findPeerByID(message.peer_id);
+            auto peer_it = findPeerByID(message.from);
             if (peer_it != m_peers.end()) {
                 disconnectPeer(peer_it);
             }
-            configurePeer(message.peer_id);
+            configurePeer(message.from);
         }
 
-        auto peer_it = findPeerByID(message.peer_id);
-        if (peer_it != m_peers.end()) {
-            LOG_ERROR_S << "Receiving signalling from " << message.peer_id
+        auto peer_it = findPeerByID(message.from);
+        if (peer_it == m_peers.end()) {
+            LOG_ERROR_S << "Receiving signalling from " << message.from
                         << " but never received a start-of-negotiation message";
             continue;
         }

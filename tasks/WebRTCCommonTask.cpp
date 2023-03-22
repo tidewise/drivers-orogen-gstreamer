@@ -37,14 +37,15 @@ bool WebRTCCommonTask::startHook()
 
     SignallingMessage message;
     message.type = SIGNALLING_NEW_PEER;
-    message.peer_id = config.self_peer_id;
+    message.from = config.self_peer_id;
     _signalling_out.write(message);
 
     if (!config.remote_peer_id.empty()) {
         if (config.polite) {
             SignallingMessage message;
             message.type = SIGNALLING_REQUEST_OFFER;
-            message.peer_id = config.remote_peer_id;
+            message.from = config.self_peer_id;
+            message.to = config.remote_peer_id;
             _signalling_out.write(message);
         }
     }
@@ -105,8 +106,9 @@ void WebRTCCommonTask::onOfferCreated(Peer const& peer,
 {
     SignallingMessage msg;
     msg.type = SIGNALLING_OFFER;
-    msg.peer_id = peer.peer_id;
     msg.message = gst_sdp_message_as_text(offer.sdp);
+    msg.from = m_signalling_config.self_peer_id;
+    msg.to = peer.peer_id;
     _signalling_out.write(msg);
 }
 void WebRTCCommonTask::processSignallingMessage(GstElement* webrtcbin,
@@ -174,7 +176,8 @@ void WebRTCCommonTask::onICECandidate(Peer const& peer,
 {
     SignallingMessage msg;
     msg.type = SIGNALLING_ICE_CANDIDATE;
-    msg.peer_id = peer.peer_id;
+    msg.from = m_signalling_config.self_peer_id;
+    msg.to = peer.peer_id;
     msg.message = candidate;
     msg.m_line = m_line;
     _signalling_out.write(msg);
