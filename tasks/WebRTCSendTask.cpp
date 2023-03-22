@@ -42,6 +42,10 @@ void WebRTCSendTask::updateHook()
 
     webrtc_base::SignallingMessage message;
     while (_signalling_in.read(message) == RTT::NewData) {
+        if (message.type == SIGNALLING_NEW_PEER) {
+            continue;
+        }
+
         auto sig_config = _signalling_config.get();
         if (!sig_config.remote_peer_id.empty() &&
             sig_config.remote_peer_id != message.peer_id) {
