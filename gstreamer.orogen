@@ -70,15 +70,21 @@ task_context "WebRTCCommonTask", subclasses: "Common" do
         .needs_reliable_connection
 
     output_port "signalling_out", "/webrtc_base/SignallingMessage"
+
+    port_driven
 end
 
 task_context "WebRTCSendTask", subclasses: "WebRTCCommonTask" do
     property "encoding", "/gstreamer/Encoding"
 
     input_port "video_in", ro_ptr("/base/samples/frame/Frame")
+
+    port_driven
 end
 
 task_context "WebRTCReceiveTask", subclasses: "WebRTCCommonTask" do
     property "frame_mode", "/base/samples/frame/frame_mode_t"
     output_port "video_out", ro_ptr("/base/samples/frame/Frame")
+
+    port_driven
 end
