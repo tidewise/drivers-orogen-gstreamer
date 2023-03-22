@@ -126,17 +126,17 @@ GstElement* WebRTCSendTask::createPipeline()
 
 void WebRTCSendTask::configurePeer(string const& peer_id)
 {
-    GstUnrefGuard<GstElement> queue(gst_element_factory_make("queue", peer_id.c_str()));
-    GstUnrefGuard<GstElement> bin(gst_element_factory_make("webrtcbin", peer_id.c_str()));
-    gst_bin_add_many(GST_BIN(mPipeline), queue.get(), bin.get(), NULL);
-    gst_element_link_many(queue.get(), bin.get());
+    GstElement* queue = gst_element_factory_make("queue", ("q_" + peer_id).c_str());
+    GstElement* bin = gst_element_factory_make("webrtcbin", peer_id.c_str());
+    gst_bin_add_many(GST_BIN(mPipeline), queue, bin, NULL);
+    gst_element_link_many(queue, bin, NULL);
 
     GstUnrefGuard<GstElement> splitter(
         gst_bin_get_by_name(GST_BIN(mPipeline), "splitter"));
 
-    auto srcpad = gst_element_get_request_pad(splitter.get(), "src%d");
-    auto sinkpad = gst_element_get_static_pad(bin.get(), "sink");
-    gst_pad_link(srcpad, sinkpad);
+    GstUnrefGuard<GstPad> srcpad(gst_element_get_request_pad(splitter.get(), "src_%u"));
+    GstUnrefGuard<GstPad> sinkpad(gst_element_get_static_pad(queue, "sink"));
+    gst_pad_link(srcpad.get(), sinkpad.get());
 }
 
 void WebRTCSendTask::disconnectPeer(PeerMap::iterator peer_it)
