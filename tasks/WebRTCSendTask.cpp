@@ -103,28 +103,16 @@ void WebRTCSendTask::cleanupHook()
 
 GstElement* WebRTCSendTask::createPipeline()
 {
-    auto encoding = _encoding.get();
-    std::ostringstream pipelineDefinition;
-    pipelineDefinition << "appsrc do-timestamp=TRUE is-live=true name=src "
-                       << "! videoconvert "
-                       << "! " << encoding.encoder_element << " "
-                       << "! " << encoding.payload_element << " ";
-    if (encoding.mtu) {
-        pipelineDefinition << "mtu=" << encoding.mtu << " ";
-    }
-
-    pipelineDefinition << "! application/x-rtp,media=video,encoding-name="
-                       << encoding.encoder_name << ",payload=96"
-                       << "! tee name=\"splitter\"";
-
-    LOG_INFO_S << "using pipeline: " << pipelineDefinition.str() << std::endl;
+    string pipelineDefinition = "appsrc do-timestamp=TRUE is-live=true name=src !" +
+                                _encoding_pipeline.get() + " ! tee name=splitter";
 
     GError* error = nullptr;
-    GstElement* pipeline = gst_parse_launch(pipelineDefinition.str().c_str(), &error);
+    GstElement* pipeline = gst_parse_launch(pipelineDefinition.c_str(), &error);
     if (error) {
         string message(error->message);
         g_error_free(error);
-        throw std::runtime_error("could not create encoding pipeline " + message);
+        throw std::runtime_error(
+            "could not create encoding pipeline " + pipelineDefinition + ": " + message);
     }
 
     return pipeline;
