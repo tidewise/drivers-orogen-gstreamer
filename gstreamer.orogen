@@ -87,7 +87,7 @@ task_context "WebRTCSendTask", subclasses: "WebRTCCommonTask" do
 end
 
 task_context "WebRTCReceiveTask", subclasses: "WebRTCCommonTask" do
-    property "frame_mode", "/base/samples/frame/frame_mode_t"
+    property "frame_mode", "/base/samples/frame/frame_mode_t", "MODE_RGB"
     output_port "video_out", ro_ptr("/base/samples/frame/Frame")
 
     port_driven
