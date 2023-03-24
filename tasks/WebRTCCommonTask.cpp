@@ -68,19 +68,19 @@ void WebRTCCommonTask::cleanupHook()
     WebRTCCommonTaskBase::cleanupHook();
 }
 
-void WebRTCCommonTask::callbackNegotiationNeeded(GstElement* webrtcbin, void* task)
+void WebRTCCommonTask::callbackNegotiationNeeded(GstElement* webrtcbin, void* user_data)
 {
-    reinterpret_cast<WebRTCCommonTask*>(task)->onNegotiationNeeded(webrtcbin);
+    auto& peer(*reinterpret_cast<Peer*>(user_data));
+    peer.task->onNegotiationNeeded(peer);
 }
-void WebRTCCommonTask::onNegotiationNeeded(GstElement* webrtcbin)
+void WebRTCCommonTask::onNegotiationNeeded(Peer& peer)
 {
     LOG_INFO_S << "Negotiation needed with peer " << peer.peer_id;
     if (!m_signalling_config.polite) {
         LOG_INFO_S << "Creating offer for " << peer.peer_id;
-        auto& data = m_peers[webrtcbin];
         GstPromise* promise =
-            gst_promise_new_with_change_func(callbackOfferCreated, (gpointer)&data, NULL);
-        g_signal_emit_by_name(G_OBJECT(webrtcbin), "create-offer", NULL, promise);
+            gst_promise_new_with_change_func(callbackOfferCreated, (gpointer)&peer, NULL);
+        g_signal_emit_by_name(G_OBJECT(peer.webrtcbin), "create-offer", NULL, promise);
     }
     else {
         LOG_INFO_S << "Expecting offer from " << peer.peer_id;

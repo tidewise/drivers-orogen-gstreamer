@@ -56,7 +56,7 @@ namespace gstreamer {
         void destroyPipeline() override;
         void configureWebRTCBin(std::string const& peer_id, GstElement* webrtcbin);
 
-        void onNegotiationNeeded(GstElement* webrtcbin);
+        void onNegotiationNeeded(Peer& peer);
         static void callbackNegotiationNeeded(GstElement* promise, void* user_data);
 
         void onOfferCreated(Peer const& peer, GstWebRTCSessionDescription& offer);
