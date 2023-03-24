@@ -37,6 +37,14 @@ namespace gstreamer {
             std::string peer_id;
             GstElement* webrtcbin = nullptr;
             WebRTCCommonTask* task = nullptr;
+
+            GstWebRTCSignalingState signaling_state = GST_WEBRTC_SIGNALING_STATE_STABLE;
+            GstWebRTCPeerConnectionState peer_connection_state =
+                GST_WEBRTC_PEER_CONNECTION_STATE_NEW;
+            GstWebRTCICEConnectionState ice_connection_state =
+                GST_WEBRTC_ICE_CONNECTION_STATE_NEW;
+            GstWebRTCICEGatheringState ice_gathering_state =
+                GST_WEBRTC_ICE_GATHERING_STATE_NEW;
         };
 
         typedef std::map<GstElement*, Peer> PeerMap;
@@ -53,6 +61,19 @@ namespace gstreamer {
 
         void onOfferCreated(Peer const& peer, GstWebRTCSessionDescription& offer);
         static void callbackOfferCreated(GstPromise* promise, void* user_data);
+
+        static void callbackSignalingStateChange(GstElement* webrtcbin,
+            GParamSpec* pspec,
+            gpointer user_data);
+        static void callbackConnectionStateChange(GstElement* webrtcbin,
+            GParamSpec* pspec,
+            gpointer user_data);
+        static void callbackICEConnectionStateChange(GstElement* webrtcbin,
+            GParamSpec* pspec,
+            gpointer user_data);
+        static void callbackICEGatheringStateChange(GstElement* webrtcbin,
+            GParamSpec* pspec,
+            gpointer user_data);
 
         void onICECandidate(Peer const& peer, guint mline_index, std::string candidate);
         static void callbackICECandidate(GstElement* element,

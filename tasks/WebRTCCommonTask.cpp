@@ -74,11 +74,16 @@ void WebRTCCommonTask::callbackNegotiationNeeded(GstElement* webrtcbin, void* ta
 }
 void WebRTCCommonTask::onNegotiationNeeded(GstElement* webrtcbin)
 {
+    LOG_INFO_S << "Negotiation needed with peer " << peer.peer_id;
     if (!m_signalling_config.polite) {
+        LOG_INFO_S << "Creating offer for " << peer.peer_id;
         auto& data = m_peers[webrtcbin];
         GstPromise* promise =
             gst_promise_new_with_change_func(callbackOfferCreated, (gpointer)&data, NULL);
         g_signal_emit_by_name(G_OBJECT(webrtcbin), "create-offer", NULL, promise);
+    }
+    else {
+        LOG_INFO_S << "Expecting offer from " << peer.peer_id;
     }
 }
 void WebRTCCommonTask::callbackOfferCreated(GstPromise* promise, gpointer user_data)
@@ -97,6 +102,7 @@ void WebRTCCommonTask::callbackOfferCreated(GstPromise* promise, gpointer user_d
     gst_promise_interrupt(local_description_promise);
     gst_promise_unref(local_description_promise);
 
+    LOG_INFO_S << "Received offer/answer from webrtcbin";
     peer.task->onOfferCreated(peer, *offer);
     gst_webrtc_session_description_free(offer);
 }
@@ -109,6 +115,8 @@ void WebRTCCommonTask::onOfferCreated(Peer const& peer,
     msg.message = gst_sdp_message_as_text(offer.sdp);
     msg.from = m_signalling_config.self_peer_id;
     msg.to = peer.peer_id;
+    LOG_INFO_S << "Sending session description (offer=" << is_offer << ") to " << msg.to
+               << " : " << msg.message;
     _signalling_out.write(msg);
 }
 void WebRTCCommonTask::processSignallingMessage(GstElement* webrtcbin,
@@ -132,6 +140,7 @@ void WebRTCCommonTask::processSignallingMessage(GstElement* webrtcbin,
 void WebRTCCommonTask::processICECandidate(GstElement* webrtcbin,
     webrtc_base::SignallingMessage const& msg)
 {
+    LOG_INFO_S << "got ICE candidate from " << msg.from << ": " << msg.message;
     g_signal_emit_by_name(webrtcbin,
         "add-ice-candidate",
         msg.m_line,
@@ -154,6 +163,8 @@ void WebRTCCommonTask::processRemoteDescription(GstElement* webrtcbin,
     GstWebRTCSessionDescription* answer =
         gst_webrtc_session_description_new(GST_WEBRTC_SDP_TYPE_ANSWER, sdpMsg);
     g_assert_nonnull(answer);
+    LOG_INFO_S << "Setting remote description (offer=" << is_offer << ") from "
+               << msg.from << ": " << msg.message;
 
     GstPromise* promise = gst_promise_new();
     g_signal_emit_by_name(webrtcbin, "set-remote-description", answer, promise);
@@ -183,6 +194,42 @@ void WebRTCCommonTask::onICECandidate(Peer const& peer,
     _signalling_out.write(msg);
 }
 
+void WebRTCCommonTask::callbackSignalingStateChange(GstElement* webrtcbin,
+    GParamSpec* pspec,
+    gpointer user_data)
+{
+    auto& peer(*reinterpret_cast<WebRTCCommonTask::Peer*>(user_data));
+    g_object_get(webrtcbin, "signaling-state", &peer.signaling_state, NULL);
+    LOG_INFO_S << "Signaling state change: " << peer.signaling_state;
+}
+
+void WebRTCCommonTask::callbackConnectionStateChange(GstElement* webrtcbin,
+    GParamSpec* pspec,
+    gpointer user_data)
+{
+    auto& peer(*reinterpret_cast<WebRTCCommonTask::Peer*>(user_data));
+    g_object_get(webrtcbin, "connection-state", &peer.peer_connection_state, NULL);
+    LOG_INFO_S << "Peer connection state change: " << peer.peer_connection_state;
+}
+
+void WebRTCCommonTask::callbackICEConnectionStateChange(GstElement* webrtcbin,
+    GParamSpec* pspec,
+    gpointer user_data)
+{
+    auto& peer(*reinterpret_cast<WebRTCCommonTask::Peer*>(user_data));
+    g_object_get(webrtcbin, "ice-connection-state", &peer.ice_connection_state, NULL);
+    LOG_INFO_S << "ICE Connection state" << peer.ice_connection_state;
+}
+
+void WebRTCCommonTask::callbackICEGatheringStateChange(GstElement* webrtcbin,
+    GParamSpec* pspec,
+    gpointer user_data)
+{
+    auto& peer(*reinterpret_cast<WebRTCCommonTask::Peer*>(user_data));
+    g_object_get(webrtcbin, "ice-gathering-state", &peer.ice_gathering_state, NULL);
+    LOG_INFO_S << "ICE Gathering state" << peer.ice_gathering_state;
+}
+
 void WebRTCCommonTask::configureWebRTCBin(string const& peer_id, GstElement* webrtcbin)
 {
     auto& peer = m_peers[webrtcbin];
@@ -191,12 +238,28 @@ void WebRTCCommonTask::configureWebRTCBin(string const& peer_id, GstElement* web
     peer.webrtcbin = webrtcbin;
 
     g_signal_connect(webrtcbin,
-        "on-negotiation-needed",
-        G_CALLBACK(callbackNegotiationNeeded),
+        "notify::signaling-state",
+        G_CALLBACK(callbackSignalingStateChange),
+        (gpointer)&peer);
+    g_signal_connect(webrtcbin,
+        "notify::ice-gathering-state",
+        G_CALLBACK(callbackICEGatheringStateChange),
+        (gpointer)&peer);
+    g_signal_connect(webrtcbin,
+        "notify::ice-connection-state",
+        G_CALLBACK(callbackICEConnectionStateChange),
+        (gpointer)&peer);
+    g_signal_connect(webrtcbin,
+        "notify::connection-state",
+        G_CALLBACK(callbackConnectionStateChange),
         (gpointer)&peer);
     g_signal_connect(webrtcbin,
         "on-ice-candidate",
         G_CALLBACK(callbackICECandidate),
+        (gpointer)&peer);
+    g_signal_connect(webrtcbin,
+        "on-negotiation-needed",
+        G_CALLBACK(callbackNegotiationNeeded),
         (gpointer)&peer);
 }
 
