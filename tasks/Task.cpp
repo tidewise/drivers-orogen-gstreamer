@@ -13,7 +13,6 @@ using namespace base::samples::frame;
 Task::Task(std::string const& name)
     : TaskBase(name)
 {
-    _pipeline_initialization_timeout.set(base::Time::fromSeconds(5));
 }
 
 Task::~Task()

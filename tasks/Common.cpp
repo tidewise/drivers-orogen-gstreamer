@@ -9,6 +9,7 @@ using namespace std;
 Common::Common(std::string const& name)
     : CommonBase(name)
 {
+    _pipeline_initialization_timeout.set(base::Time::fromSeconds(5));
 }
 
 Common::~Common()
