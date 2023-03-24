@@ -89,8 +89,10 @@ namespace gstreamer {
 
         void processICECandidate(GstElement* webrtcbin,
             webrtc_base::SignallingMessage const& msg);
-        void processOffer(GstElement* webrtcbin, SignallingMessage const& msg);
-        void processAnswer(GstElement* webrtcbin, SignallingMessage const& msg);
+        void processOffer(GstElement* webrtcbin,
+            webrtc_base::SignallingMessage const& msg);
+        void processAnswer(GstElement* webrtcbin,
+            webrtc_base::SignallingMessage const& msg);
         void processRemoteDescription(GstElement* webrtcbin,
             webrtc_base::SignallingMessage const& msg,
             GstWebRTCSDPType sdp_type);

@@ -1,6 +1,7 @@
 /* Generated from orogen/lib/orogen/templates/tasks/Task.cpp */
 
 #include "WebRTCReceiveTask.hpp"
+#include "Helpers.hpp"
 #include <base-logging/Logging.hpp>
 
 using namespace gstreamer;
@@ -132,19 +133,15 @@ GstElement* WebRTCReceiveTask::createPipeline(string const& peer_id)
 void WebRTCReceiveTask::handleVideoStream(GstElement* bin, GstPad* pad)
 {
     GstElement* q = gst_element_factory_make("queue", NULL);
-    g_assert_nonnull(q);
     GstElement* conv = gst_element_factory_make("videoconvert", NULL);
-    g_assert_nonnull(conv);
-    GstElement* sink = gst_element_factory_make("appsink", NULL);
-    gst_element_set_name(sink, "video_out");
-    g_assert_nonnull(sink);
-    configureOutput(bin, "video_out", _frame_mode.get(), false, _video_out);
+    GstElement* sink = gst_element_factory_make("appsink", "video_out");
 
     gst_bin_add_many(GST_BIN(bin), q, conv, sink, NULL);
     gst_element_sync_state_with_parent(q);
     gst_element_sync_state_with_parent(conv);
     gst_element_sync_state_with_parent(sink);
     gst_element_link_many(q, conv, sink, NULL);
+    configureOutput(bin, "video_out", _frame_mode.get(), false, _video_out);
 
     GstPad* qpad = gst_element_get_static_pad(q, "sink");
 
@@ -156,21 +153,16 @@ void WebRTCReceiveTask::callbackIncomingDecodebinStream(GstElement* decodebin,
     GstPad* pad,
     WebRTCReceiveTask* task)
 {
+    LOG_INFO_S << "New decodebin stream";
+
     if (!gst_pad_has_current_caps(pad)) {
         g_printerr("Pad '%s' has no caps, can't do anything, ignoring\n",
             GST_PAD_NAME(pad));
         return;
     }
 
-    GstCaps* caps = gst_pad_get_current_caps(pad);
-    const gchar* name = gst_structure_get_name(gst_caps_get_structure(caps, 0));
-    if (g_str_has_prefix(name, "video")) {
-        GstElement* bin = GST_ELEMENT(gst_element_get_parent(decodebin));
-        task->handleVideoStream(bin, pad);
-    }
-    else {
-        gst_printerr("Unknown pad %s, ignoring", GST_PAD_NAME(pad));
-    }
+    GstElement* bin = GST_ELEMENT(gst_element_get_parent(decodebin));
+    task->handleVideoStream(bin, pad);
 }
 
 void WebRTCReceiveTask::callbackIncomingStream(GstElement* webrtcbin,
@@ -182,19 +174,29 @@ void WebRTCReceiveTask::callbackIncomingStream(GstElement* webrtcbin,
 
 void WebRTCReceiveTask::onIncomingStream(GstElement* webrtcbin, GstPad* pad)
 {
+    LOG_INFO_S << "New stream received";
+
     if (GST_PAD_DIRECTION(pad) != GST_PAD_SRC) {
+        LOG_INFO_S << "New stream pad is sink, not source. Ignoring";
         return;
     }
+
+    auto const& peer = m_peers[webrtcbin];
+    GstElement* bin = gst_bin_new((peer.peer_id + "_receivebin").c_str());
+    gst_bin_add(GST_BIN(mPipeline), bin);
 
     GstElement* decodebin = gst_element_factory_make("decodebin", NULL);
     g_signal_connect(decodebin,
         "pad-added",
         G_CALLBACK(callbackIncomingDecodebinStream),
         this);
-    gst_bin_add(GST_BIN(webrtcbin), decodebin);
-    gst_element_sync_state_with_parent(decodebin);
+    gst_bin_add(GST_BIN(bin), decodebin);
 
-    GstPad* decode_sink = gst_element_get_static_pad(decodebin, "sink");
-    gst_pad_link(pad, decode_sink);
-    gst_object_unref(decode_sink);
+    GstUnrefGuard<GstPad> decode_sink(gst_element_get_static_pad(decodebin, "sink"));
+    auto bin_pad = gst_ghost_pad_new("sink", decode_sink.get());
+    gst_element_add_pad(bin, bin_pad);
+    gst_pad_link(pad, bin_pad);
+
+    gst_element_sync_state_with_parent(bin);
+    gst_element_sync_state_with_parent(decodebin);
 }
