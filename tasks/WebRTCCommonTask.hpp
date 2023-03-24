@@ -59,8 +59,14 @@ namespace gstreamer {
         void onNegotiationNeeded(Peer& peer);
         static void callbackNegotiationNeeded(GstElement* promise, void* user_data);
 
-        void onOfferCreated(Peer const& peer, GstWebRTCSessionDescription& offer);
-        static void callbackOfferCreated(GstPromise* promise, void* user_data);
+        void onSessionDescriptionCreated(Peer const& peer,
+            GstWebRTCSessionDescription& description,
+            bool is_offer);
+        static void callbackAnswerCreated(GstPromise* promise, gpointer user_data);
+        static void callbackOfferCreated(GstPromise* promise, gpointer user_data);
+        static void callbackSessionDescriptionCreated(GstPromise* promise,
+            void* user_data,
+            bool is_offer);
 
         static void callbackSignalingStateChange(GstElement* webrtcbin,
             GParamSpec* pspec,
@@ -83,8 +89,11 @@ namespace gstreamer {
 
         void processICECandidate(GstElement* webrtcbin,
             webrtc_base::SignallingMessage const& msg);
+        void processOffer(GstElement* webrtcbin, SignallingMessage const& msg);
+        void processAnswer(GstElement* webrtcbin, SignallingMessage const& msg);
         void processRemoteDescription(GstElement* webrtcbin,
-            webrtc_base::SignallingMessage const& msg);
+            webrtc_base::SignallingMessage const& msg,
+            GstWebRTCSDPType sdp_type);
 
         void processSignallingMessage(GstElement* webrtcbin,
             webrtc_base::SignallingMessage const& msg);

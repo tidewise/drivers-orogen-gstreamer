@@ -86,35 +86,52 @@ void WebRTCCommonTask::onNegotiationNeeded(Peer& peer)
         LOG_INFO_S << "Expecting offer from " << peer.peer_id;
     }
 }
+void WebRTCCommonTask::callbackAnswerCreated(GstPromise* promise, gpointer user_data)
+{
+    callbackSessionDescriptionCreated(promise, user_data, false);
+}
 void WebRTCCommonTask::callbackOfferCreated(GstPromise* promise, gpointer user_data)
+{
+    callbackSessionDescriptionCreated(promise, user_data, true);
+}
+void WebRTCCommonTask::callbackSessionDescriptionCreated(GstPromise* promise,
+    gpointer user_data,
+    bool is_offer)
 {
     Peer const& peer = *reinterpret_cast<Peer*>(user_data);
     GstStructure const* reply = gst_promise_get_reply(promise);
-    GstWebRTCSessionDescription* offer = NULL;
-    gst_structure_get(reply, "offer", GST_TYPE_WEBRTC_SESSION_DESCRIPTION, &offer, NULL);
+    GstWebRTCSessionDescription* description = NULL;
+    char const* field = is_offer ? "offer" : "answer";
+    gst_structure_get(reply,
+        field,
+        GST_TYPE_WEBRTC_SESSION_DESCRIPTION,
+        &description,
+        NULL);
     gst_promise_unref(promise);
 
     GstPromise* local_description_promise = gst_promise_new();
     g_signal_emit_by_name(peer.webrtcbin,
         "set-local-description",
-        offer,
+        description,
         local_description_promise);
     gst_promise_interrupt(local_description_promise);
     gst_promise_unref(local_description_promise);
 
     LOG_INFO_S << "Received offer/answer from webrtcbin";
-    peer.task->onOfferCreated(peer, *offer);
-    gst_webrtc_session_description_free(offer);
+    peer.task->onSessionDescriptionCreated(peer, *description, is_offer);
+    gst_webrtc_session_description_free(description);
 }
 
-void WebRTCCommonTask::onOfferCreated(Peer const& peer,
-    GstWebRTCSessionDescription& offer)
+void WebRTCCommonTask::onSessionDescriptionCreated(Peer const& peer,
+    GstWebRTCSessionDescription& description,
+    bool is_offer)
 {
     SignallingMessage msg;
-    msg.type = SIGNALLING_OFFER;
-    msg.message = gst_sdp_message_as_text(offer.sdp);
+    msg.type = is_offer ? SIGNALLING_OFFER : SIGNALLING_ANSWER;
     msg.from = m_signalling_config.self_peer_id;
     msg.to = peer.peer_id;
+    msg.message = gst_sdp_message_as_text(description.sdp);
+
     LOG_INFO_S << "Sending session description (offer=" << is_offer << ") to " << msg.to
                << " : " << msg.message;
     _signalling_out.write(msg);
@@ -124,7 +141,7 @@ void WebRTCCommonTask::processSignallingMessage(GstElement* webrtcbin,
 {
     if (msg.type == SIGNALLING_OFFER) {
         if (m_signalling_config.polite) {
-            processRemoteDescription(webrtcbin, msg);
+            processOffer(webrtcbin, msg);
         }
     }
     else if (msg.type == SIGNALLING_ICE_CANDIDATE) {
@@ -132,7 +149,7 @@ void WebRTCCommonTask::processSignallingMessage(GstElement* webrtcbin,
     }
     else if (msg.type == SIGNALLING_ANSWER) {
         if (!m_signalling_config.polite) {
-            processRemoteDescription(webrtcbin, msg);
+            processAnswer(webrtcbin, msg);
         }
     }
 }
@@ -147,8 +164,27 @@ void WebRTCCommonTask::processICECandidate(GstElement* webrtcbin,
         msg.message.c_str());
 }
 
+void WebRTCCommonTask::processOffer(GstElement* webrtcbin, SignallingMessage const& msg)
+{
+    LOG_INFO_S << "Setting remote offer from " << msg.from << ": " << msg.message;
+    processRemoteDescription(webrtcbin, msg, GST_WEBRTC_SDP_TYPE_OFFER);
+
+    auto& peer = m_peers.at(webrtcbin);
+    GstPromise* promise =
+        gst_promise_new_with_change_func(callbackAnswerCreated, (gpointer)&peer, NULL);
+    LOG_INFO_S << "Requesting answer from webrtcbin";
+    g_signal_emit_by_name(G_OBJECT(peer.webrtcbin), "create-answer", NULL, promise);
+}
+
+void WebRTCCommonTask::processAnswer(GstElement* webrtcbin, SignallingMessage const& msg)
+{
+    LOG_INFO_S << "Setting remote answer from " << msg.from << ": " << msg.message;
+    processRemoteDescription(webrtcbin, msg, GST_WEBRTC_SDP_TYPE_ANSWER);
+}
+
 void WebRTCCommonTask::processRemoteDescription(GstElement* webrtcbin,
-    SignallingMessage const& msg)
+    SignallingMessage const& msg,
+    GstWebRTCSDPType sdp_type)
 {
     GstSDPMessage* sdpMsg;
     int ret = gst_sdp_message_new(&sdpMsg);
@@ -160,14 +196,12 @@ void WebRTCCommonTask::processRemoteDescription(GstElement* webrtcbin,
         return;
     }
 
-    GstWebRTCSessionDescription* answer =
-        gst_webrtc_session_description_new(GST_WEBRTC_SDP_TYPE_ANSWER, sdpMsg);
-    g_assert_nonnull(answer);
-    LOG_INFO_S << "Setting remote description (offer=" << is_offer << ") from "
-               << msg.from << ": " << msg.message;
+    GstWebRTCSessionDescription* description =
+        gst_webrtc_session_description_new(sdp_type, sdpMsg);
+    g_assert_nonnull(description);
 
     GstPromise* promise = gst_promise_new();
-    g_signal_emit_by_name(webrtcbin, "set-remote-description", answer, promise);
+    g_signal_emit_by_name(webrtcbin, "set-remote-description", description, promise);
     gst_promise_interrupt(promise);
     gst_promise_unref(promise);
 }
