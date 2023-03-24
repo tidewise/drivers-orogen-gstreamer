@@ -34,7 +34,7 @@ bool WebRTCSendTask::startHook()
     if (!WebRTCSendTaskBase::startHook())
         return false;
 
-    waitFirstFrames(base::Time::now() + _pipeline_initialization_timeout.get());
+    startPipeline();
     return true;
 }
 void WebRTCSendTask::updateHook()
@@ -110,9 +110,9 @@ void WebRTCSendTask::cleanupHook()
 
 GstElement* WebRTCSendTask::createPipeline()
 {
-    string pipelineDefinition = "webrtcbin name=webrtc appsrc format=3 do-timestamp=TRUE "
+    string pipelineDefinition = "appsrc format=3 do-timestamp=TRUE "
                                 "is-live=true name=src !" +
-                                _encoding_pipeline.get() + " ! webrtc.";
+                                _encoding_pipeline.get() + " ! tee name=splitter";
 
     GError* error = nullptr;
     GstElement* pipeline = gst_parse_launch(pipelineDefinition.c_str(), &error);
@@ -129,40 +129,31 @@ GstElement* WebRTCSendTask::createPipeline()
 
 void WebRTCSendTask::configurePeer(string const& peer_id)
 {
-    GstElement* bin = gst_bin_get_by_name(GST_BIN(mPipeline), "webrtc");
-    configureWebRTCBin(peer_id, bin);
+    GstElement* bin = gst_bin_new((peer_id + "_bin").c_str());
+    GstElement* queue = gst_element_factory_make("queue", ("q_" + peer_id).c_str());
+    GstElement* webrtc = gst_element_factory_make("webrtcbin", peer_id.c_str());
+    gst_bin_add_many(GST_BIN(bin), queue, webrtc, nullptr);
+    gst_element_link_many(queue, webrtc, nullptr);
+    GstUnrefGuard<GstPad> queue_sink(gst_element_get_static_pad(queue, "sink"));
+    auto pad = gst_ghost_pad_new("sink", queue_sink.get());
+    gst_element_add_pad(bin, pad);
+    gst_bin_add(GST_BIN(mPipeline), bin);
 
-    /* GstElement* queue = gst_element_factory_make("queue", ("q_" + peer_id).c_str()); */
-    /* GstElement* bin = gst_element_factory_make("webrtcbin", peer_id.c_str()); */
-    /* gst_bin_add(GST_BIN(mPipeline), bin); */
-    /* gst_bin_add(GST_BIN(bin), queue); */
+    GstUnrefGuard<GstElement> splitter(
+        gst_bin_get_by_name(GST_BIN(mPipeline), "splitter"));
+    GstUnrefGuard<GstPad> srcpad(gst_element_get_request_pad(splitter.get(), "src_%u"));
+    gst_pad_link(srcpad.get(), pad);
 
-    /* GstUnrefGuard<GstElement> splitter( */
-    /*     gst_bin_get_by_name(GST_BIN(mPipeline), "splitter")); */
+    configureWebRTCBin(peer_id, webrtc);
+    auto& elements = m_dynamic_elements[webrtc];
+    elements.tee_pad = srcpad.get();
+    elements.bin = bin;
 
-    /* GstUnrefGuard<GstPad> srcpad(gst_element_get_request_pad(splitter.get(),
-     * "src_%u")); */
-    /* GstUnrefGuard<GstPad> sinkpad(gst_element_get_static_pad(queue, "sink")); */
-    /* auto pad = gst_ghost_pad_new(("q_src_" + peer_id).c_str(), sinkpad.get()); */
-    /* gst_element_add_pad(bin, pad); */
-    /* gst_pad_link(srcpad.get(), pad); */
-
-    auto const& in = *mConfiguredInputs.begin();
-    GstUnrefGuard<GstElement> src(gst_bin_get_by_name(GST_BIN(mPipeline), "src"));
-    gst_app_src_set_max_bytes(GST_APP_SRC(src.get()), in.width * in.height * 4 * 5);
-    startPipeline();
-
-    /* bool ret = gst_element_sync_state_with_parent(bin) && */
-    /*            gst_element_sync_state_with_parent(queue); */
-    /* if (!ret) { */
-    /*     throw std::runtime_error("failed to create webrtc elements for peer " +
-     * peer_id); */
-    /* } */
-
-    /* auto& elements = m_dynamic_elements[bin]; */
-    /* elements.tee_pad = srcpad.get(); */
-    /* elements.queue = queue; */
-    /* elements.bin = bin; */
+    bool ret = gst_element_sync_state_with_parent(bin);
+    if (!ret) {
+        throw std::runtime_error(
+            "failed to create streaming elements for peer " + peer_id);
+    }
 
     LOG_INFO_S << "Configured pipeline for peer " << peer_id;
     GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(mPipeline),
@@ -172,24 +163,18 @@ void WebRTCSendTask::configurePeer(string const& peer_id)
 
 void WebRTCSendTask::disconnectPeer(PeerMap::iterator peer_it)
 {
-    return;
     Peer peer = peer_it->second;
     m_peers.erase(peer_it);
-
-    if (m_peers.size() == 1) {
-        gst_element_set_state(mPipeline, GST_STATE_PAUSED);
-    }
 
     auto it = m_dynamic_elements.find(peer.webrtcbin);
     auto elements = it->second;
     m_dynamic_elements.erase(it);
 
-    gst_element_set_state(elements.queue, GST_STATE_NULL);
     gst_element_set_state(elements.bin, GST_STATE_NULL);
     GstUnrefGuard<GstElement> splitter(
         gst_bin_get_by_name(GST_BIN(mPipeline), "splitter"));
-    gst_element_unlink_many(splitter.get(), elements.queue, elements.bin, nullptr);
-    gst_bin_remove_many(GST_BIN(mPipeline), elements.queue, elements.bin, nullptr);
+    gst_element_unlink_many(splitter.get(), elements.bin, nullptr);
+    gst_bin_remove_many(GST_BIN(mPipeline), elements.bin, nullptr);
 
     gst_element_release_request_pad(splitter.get(), elements.tee_pad);
 }

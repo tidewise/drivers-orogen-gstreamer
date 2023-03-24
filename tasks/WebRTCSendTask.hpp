@@ -35,7 +35,6 @@ namespace gstreamer {
 
         struct DynamicElements {
             GstPad* tee_pad = nullptr;
-            GstElement* queue = nullptr;
             GstElement* bin = nullptr;
         };
         std::map<GstElement*, DynamicElements> m_dynamic_elements;
