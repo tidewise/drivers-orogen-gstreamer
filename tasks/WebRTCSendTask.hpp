@@ -33,7 +33,12 @@ namespace gstreamer {
         void disconnectPeer(PeerMap::iterator peer_it);
         void configurePeer(std::string const& peer_id);
 
-        std::map<GstElement*, GstPad*> m_tee_pads;
+        struct DynamicElements {
+            GstPad* tee_pad = nullptr;
+            GstElement* queue = nullptr;
+            GstElement* bin = nullptr;
+        };
+        std::map<GstElement*, DynamicElements> m_dynamic_elements;
 
     public:
         /** TaskContext constructor for WebRTCSendTask

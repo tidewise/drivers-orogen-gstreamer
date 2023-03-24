@@ -76,7 +76,8 @@ end
 
 task_context "WebRTCSendTask", subclasses: "WebRTCCommonTask" do
     property "encoding_pipeline", "string", <<~GST_PIPELINE
-        x264enc bitrate=1500 cabac=true !
+        videoconvert !
+        x264enc bitrate=2000 cabac=true !
         video/x-h264,profile=main ! rtph264pay !
         application/x-rtp,media=video,encoding-name=H264,payload=96
     GST_PIPELINE
