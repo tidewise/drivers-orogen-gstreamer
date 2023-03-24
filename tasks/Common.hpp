@@ -83,7 +83,7 @@ namespace gstreamer {
             bool dynamic,
             FrameOutputPort& port);
         void configureInput(GstElement* pipeline,
-            InputConfig const& config,
+            std::string const& name,
             bool dynamic,
             FrameInputPort& port);
         void waitFirstFrames(base::Time const& deadline);

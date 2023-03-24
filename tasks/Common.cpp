@@ -146,14 +146,14 @@ void Common::configureOutput(GstElement* pipeline,
 }
 
 void Common::configureInput(GstElement* pipeline,
-    InputConfig const& config,
+    std::string const& name,
     bool dynamic,
     FrameInputPort& port)
 {
-    GstElement* appsrc = gst_bin_get_by_name(GST_BIN(pipeline), config.name.c_str());
+    GstElement* appsrc = gst_bin_get_by_name(GST_BIN(pipeline), name.c_str());
     if (!appsrc) {
         throw std::runtime_error(
-            "cannot find appsrc element named " + config.name + "in pipeline");
+            "cannot find appsrc element named " + name + "in pipeline");
     }
     GstUnrefGuard<GstElement> refguard(appsrc);
     g_object_set(appsrc, "is-live", TRUE, NULL);

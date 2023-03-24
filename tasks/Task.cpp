@@ -75,7 +75,7 @@ void Task::configureInputs(GstElement* pipeline)
     auto config = _inputs.get();
     for (auto const& inputConfig : config) {
         unique_ptr<FrameInputPort> port(new FrameInputPort(inputConfig.name));
-        configureInput(pipeline, inputConfig, true, *port);
+        configureInput(pipeline, inputConfig.name, true, *port);
         ports()->addEventPort(inputConfig.name, *port);
         port.release();
     }
