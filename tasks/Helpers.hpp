@@ -82,7 +82,8 @@ namespace gstreamer {
             default:
                 // Should not happen, the component validates the frame mode
                 // against the accepted modes
-                throw std::runtime_error("unsupported raw format received");
+                throw std::runtime_error("unsupported base::samples::frame_mode " +
+                                         std::to_string(frame_mode));
         }
     }
 
