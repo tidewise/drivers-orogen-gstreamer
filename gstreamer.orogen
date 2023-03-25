@@ -68,6 +68,7 @@ task_context "WebRTCCommonTask", subclasses: "Common" do
 
     input_port("signalling_in", "/webrtc_base/SignallingMessage")
         .needs_reliable_connection
+        .multiplexes
 
     output_port "signalling_out", "/webrtc_base/SignallingMessage"
 
