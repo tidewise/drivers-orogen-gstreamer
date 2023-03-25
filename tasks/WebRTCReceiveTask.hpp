@@ -30,6 +30,7 @@ namespace gstreamer {
         friend class WebRTCReceiveTaskBase;
 
     protected:
+        std::string getCurrentPeer() const;
         GstElement* createPipeline(std::string const& peer_id = "");
 
         static void callbackIncomingStream(GstElement* webrtcbin,
@@ -41,6 +42,10 @@ namespace gstreamer {
             GstPad* pad,
             WebRTCReceiveTask* task);
         void handleVideoStream(GstElement* bin, GstPad* pad);
+
+        void processSignallingMessage(
+            webrtc_base::SignallingMessage const& message) override;
+        void handlePeerDisconnection(std::string const& peer_id) override;
 
     public:
         /** TaskContext constructor for WebRTCReceiveTask

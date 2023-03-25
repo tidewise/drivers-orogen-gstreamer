@@ -97,8 +97,21 @@ namespace gstreamer {
             webrtc_base::SignallingMessage const& msg,
             GstWebRTCSDPType sdp_type);
 
+        /** Handler called by the task updateHook to process incoming signalling messages
+         */
+        virtual void processSignallingMessage(
+            webrtc_base::SignallingMessage const& msg) = 0;
+
+        /** Handler called by the task updateHook to handle peer disconnection
+         */
+        virtual void handlePeerDisconnection(std::string const& peer_id) = 0;
+
+        /** Common handling of signalling messages for the webrtcbin */
         void processSignallingMessage(GstElement* webrtcbin,
             webrtc_base::SignallingMessage const& msg);
+        void waitForMessage(std::function<bool(webrtc_base::SignallingMessage const&)> f,
+            base::Time const& timeout = base::Time::fromSeconds(2),
+            base::Time const& poll_period = base::Time::fromMilliseconds(10));
 
     public:
         /** TaskContext constructor for WebRTCCommonTask

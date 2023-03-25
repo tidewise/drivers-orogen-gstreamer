@@ -55,51 +55,56 @@ bool WebRTCReceiveTask::startHook()
 void WebRTCReceiveTask::updateHook()
 {
     WebRTCReceiveTaskBase::updateHook();
-
-    webrtc_base::SignallingMessage message;
-    while (_signalling_in.read(message) == RTT::NewData) {
-        if (message.type == SIGNALLING_NEW_PEER) {
-            continue;
-        }
-
-        LOG_INFO_S << "Signalling: " << message.type << " from " << message.from << ": "
-                   << message.message;
-        auto sig_config = _signalling_config.get();
-        if (!sig_config.remote_peer_id.empty() &&
-            sig_config.remote_peer_id != message.from) {
-            LOG_ERROR_S << "Received signalling message from " + message.from +
-                               " but this component is configured to establish "
-                               "connection with " +
-                               sig_config.remote_peer_id + " only";
-            continue;
-        }
-
-        if (message.type == SIGNALLING_REQUEST_OFFER) {
-            if (sig_config.polite) {
-                LOG_ERROR_S << "Polite peer trying to request offer, but polite is true";
-                continue;
-            }
-
-            if (mPipeline) {
-                destroyPipeline();
-            }
-            mPipeline = createPipeline(message.from);
-            continue;
-        }
-        else if (message.type == SIGNALLING_OFFER) {
-            auto sig_config = _signalling_config.get();
-            if (!sig_config.polite) {
-                LOG_ERROR_S << "Received offer, but polite is false";
-                continue;
-            }
-
-            m_peers.begin()->second.peer_id = message.from;
-        }
-
-        auto webrtcbin = m_peers.begin()->first;
-        processSignallingMessage(webrtcbin, message);
-    }
 }
+void WebRTCReceiveTask::processSignallingMessage(SignallingMessage const& message)
+{
+    LOG_INFO_S << "Signalling: " << message.type << " from " << message.from << ": "
+               << message.message;
+    auto sig_config = _signalling_config.get();
+    if (!sig_config.remote_peer_id.empty() && sig_config.remote_peer_id != message.from) {
+        LOG_ERROR_S << "Received signalling message from " + message.from +
+                           " but this component is configured to establish "
+                           "connection with " +
+                           sig_config.remote_peer_id + " only";
+        return;
+    }
+
+    if (message.type == SIGNALLING_REQUEST_OFFER) {
+        if (sig_config.polite) {
+            LOG_ERROR_S << "Polite peer trying to request offer, but polite is true";
+            return;
+        }
+
+        if (mPipeline) {
+            destroyPipeline();
+        }
+        mPipeline = createPipeline(message.from);
+        startPipeline();
+        return;
+    }
+    else if (message.type == SIGNALLING_OFFER) {
+        auto sig_config = _signalling_config.get();
+        if (!sig_config.polite) {
+            LOG_ERROR_S << "Received offer, but polite is false";
+            return;
+        }
+
+        m_peers.begin()->second.peer_id = message.from;
+    }
+
+    auto webrtcbin = m_peers.begin()->first;
+    WebRTCCommonTask::processSignallingMessage(webrtcbin, message);
+}
+
+void WebRTCReceiveTask::handlePeerDisconnection(std::string const& peer_id)
+{
+    if (peer_id != getCurrentPeer()) {
+        return;
+    }
+
+    destroyPipeline();
+}
+
 void WebRTCReceiveTask::errorHook()
 {
     WebRTCReceiveTaskBase::errorHook();
@@ -113,6 +118,14 @@ void WebRTCReceiveTask::cleanupHook()
     WebRTCReceiveTaskBase::cleanupHook();
 }
 
+string WebRTCReceiveTask::getCurrentPeer() const
+{
+    if (m_peers.empty()) {
+        return string();
+    }
+
+    return m_peers.begin()->second.peer_id;
+}
 GstElement* WebRTCReceiveTask::createPipeline(string const& peer_id)
 {
     GstUnrefGuard<GstElement> pipe(gst_pipeline_new("receivepipe"));

@@ -64,6 +64,8 @@ task_context "Task", subclasses: "Common" do
 end
 
 task_context "WebRTCCommonTask", subclasses: "Common" do
+    abstract
+
     property "signalling_config", "/gstreamer/SignallingConfig"
 
     input_port("signalling_in", "/webrtc_base/SignallingMessage")

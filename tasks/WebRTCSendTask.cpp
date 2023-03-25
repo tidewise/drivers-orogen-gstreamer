@@ -40,60 +40,49 @@ bool WebRTCSendTask::startHook()
 void WebRTCSendTask::updateHook()
 {
     WebRTCSendTaskBase::updateHook();
+}
 
-    webrtc_base::SignallingMessage message;
-    while (_signalling_in.read(message) == RTT::NewData) {
-        if (message.type == SIGNALLING_NEW_PEER) {
-            continue;
-        }
-
-        LOG_INFO_S << "Signalling: " << message.type << " from " << message.from << ": "
-                   << message.message;
-        auto sig_config = _signalling_config.get();
-        if (!sig_config.remote_peer_id.empty() &&
-            sig_config.remote_peer_id != message.from) {
-            LOG_ERROR_S << "Received signalling message from " + message.from +
-                               " but this component is configured to establish "
-                               "connection with " +
-                               sig_config.remote_peer_id + " only";
-            continue;
-        }
-
-        if (message.type == SIGNALLING_REQUEST_OFFER) {
-            if (sig_config.polite) {
-                LOG_ERROR_S << "Polite peer trying to request offer, but polite is true";
-                continue;
-            }
-
-            auto peer_it = findPeerByID(message.from);
-            if (peer_it != m_peers.end()) {
-                disconnectPeer(peer_it);
-            }
-            configurePeer(message.from);
-            continue;
-        }
-        else if (message.type == SIGNALLING_OFFER) {
-            auto sig_config = _signalling_config.get();
-            if (!sig_config.polite) {
-                LOG_ERROR_S << "Received offer, but polite is false";
-                continue;
-            }
-
-            auto peer_it = findPeerByID(message.from);
-            if (peer_it != m_peers.end()) {
-                disconnectPeer(peer_it);
-            }
-            configurePeer(message.from);
-        }
-
-        auto peer_it = findPeerByID(message.from);
-        if (peer_it == m_peers.end()) {
-            LOG_ERROR_S << "Receiving signalling from " << message.from
-                        << " but never received a start-of-negotiation message";
-            continue;
-        }
-        processSignallingMessage(peer_it->second.webrtcbin, message);
+void WebRTCSendTask::processSignallingMessage(SignallingMessage const& message)
+{
+    LOG_INFO_S << "Signalling: " << message.type << " from " << message.from << ": "
+               << message.message;
+    auto sig_config = _signalling_config.get();
+    if (!sig_config.remote_peer_id.empty() && sig_config.remote_peer_id != message.from) {
+        LOG_ERROR_S << "Received signalling message from " + message.from +
+                           " but this component is configured to establish "
+                           "connection with " +
+                           sig_config.remote_peer_id + " only";
+        return;
     }
+
+    if (message.type == SIGNALLING_REQUEST_OFFER) {
+        if (sig_config.polite) {
+            LOG_ERROR_S << "Polite peer trying to request offer, but polite is true";
+            return;
+        }
+
+        handlePeerDisconnection(message.from);
+        configurePeer(message.from);
+        return;
+    }
+    else if (message.type == SIGNALLING_OFFER) {
+        auto sig_config = _signalling_config.get();
+        if (!sig_config.polite) {
+            LOG_ERROR_S << "Received offer, but polite is false";
+            return;
+        }
+
+        handlePeerDisconnection(message.from);
+        configurePeer(message.from);
+    }
+
+    auto peer_it = findPeerByID(message.from);
+    if (peer_it == m_peers.end()) {
+        LOG_ERROR_S << "Receiving signalling from " << message.from
+                    << " but never received a start-of-negotiation message";
+        return;
+    }
+    WebRTCCommonTask::processSignallingMessage(peer_it->second.webrtcbin, message);
 }
 void WebRTCSendTask::errorHook()
 {
@@ -161,6 +150,14 @@ void WebRTCSendTask::configurePeer(string const& peer_id)
         "sender-configured");
 }
 
+void WebRTCSendTask::handlePeerDisconnection(std::string const& peer_id)
+{
+    auto peer_it = findPeerByID(peer_id);
+    if (peer_it != m_peers.end()) {
+        disconnectPeer(peer_it);
+    }
+}
+
 void WebRTCSendTask::disconnectPeer(PeerMap::iterator peer_it)
 {
     Peer peer = peer_it->second;
@@ -177,4 +174,11 @@ void WebRTCSendTask::disconnectPeer(PeerMap::iterator peer_it)
     gst_bin_remove_many(GST_BIN(mPipeline), elements.bin, nullptr);
 
     gst_element_release_request_pad(splitter.get(), elements.tee_pad);
+}
+
+void WebRTCSendTask::destroyPipeline()
+{
+    m_dynamic_elements.clear();
+
+    WebRTCSendTaskBase::destroyPipeline();
 }

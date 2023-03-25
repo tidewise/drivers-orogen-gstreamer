@@ -54,13 +54,62 @@ bool WebRTCCommonTask::startHook()
 void WebRTCCommonTask::updateHook()
 {
     WebRTCCommonTaskBase::updateHook();
+
+    webrtc_base::SignallingMessage message;
+    while (_signalling_in.read(message) == RTT::NewData) {
+        if (message.type == SIGNALLING_NEW_PEER) {
+            continue;
+        }
+        else if (message.type == SIGNALLING_PEER_DISCONNECT) {
+            SignallingMessage ack;
+            ack.from = m_signalling_config.self_peer_id;
+            ack.type = SIGNALLING_PEER_DISCONNECTED;
+            ack.message = message.from;
+            _signalling_out.write(ack);
+
+            handlePeerDisconnection(message.from);
+        }
+        else if (message.type == SIGNALLING_PEER_DISCONNECTED) {
+            handlePeerDisconnection(message.from);
+            return;
+        }
+
+        processSignallingMessage(message);
+    }
 }
+
 void WebRTCCommonTask::errorHook()
 {
     WebRTCCommonTaskBase::errorHook();
 }
+
+class TimeoutError : public std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
 void WebRTCCommonTask::stopHook()
 {
+    string peer_id = m_signalling_config.self_peer_id;
+
+    SignallingMessage msg;
+    msg.type = SIGNALLING_PEER_DISCONNECT;
+    msg.from = peer_id;
+    _signalling_out.write(msg);
+
+    // Signalling component should be mirroring this to us to allow for proper
+    // synchronization
+    try {
+        waitForMessage([peer_id](SignallingMessage const& msg_in) {
+            return msg_in.type == SIGNALLING_PEER_DISCONNECTED &&
+                   msg_in.message == peer_id;
+        });
+    }
+    catch (TimeoutError&) {
+        LOG_INFO_S
+            << "Timed out waiting for disconnection ack from the signalling server";
+        // ignore, it is not critical for the well-functioning of the webrtc components
+    }
+
     WebRTCCommonTaskBase::stopHook();
 }
 void WebRTCCommonTask::cleanupHook()
@@ -312,4 +361,25 @@ WebRTCCommonTask::PeerMap::iterator WebRTCCommonTask::findPeerByID(
         [peer_id](std::pair<GstElement*, Peer> const& v) {
             return v.second.peer_id == peer_id;
         });
+}
+
+void WebRTCCommonTask::waitForMessage(
+    std::function<bool(webrtc_base::SignallingMessage const&)> f,
+    base::Time const& timeout,
+    base::Time const& poll_period)
+{
+    base::Time deadline = base::Time::now() + timeout;
+
+    do {
+        SignallingMessage msg;
+        while (_signalling_in.read(msg) == RTT::NewData) {
+            if (f(msg)) {
+                return;
+            }
+        }
+
+        usleep(poll_period.toMicroseconds());
+    } while (base::Time::now() <= deadline);
+
+    throw TimeoutError("did not receive message in time");
 }
