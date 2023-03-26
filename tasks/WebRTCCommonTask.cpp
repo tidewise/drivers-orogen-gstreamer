@@ -57,7 +57,10 @@ void WebRTCCommonTask::updateHook()
 
     webrtc_base::SignallingMessage message;
     while (_signalling_in.read(message) == RTT::NewData) {
-        if (message.type == SIGNALLING_NEW_PEER) {
+        if (!message.to.empty() && message.to != m_signalling_config.self_peer_id) {
+            continue;
+        }
+        else if (message.type == SIGNALLING_NEW_PEER) {
             continue;
         }
         else if (message.type == SIGNALLING_PEER_DISCONNECT) {
