@@ -116,8 +116,10 @@ void Task::errorHook()
 void Task::stopHook()
 {
     TaskBase::stopHook();
+    gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PAUSED);
 }
 void Task::cleanupHook()
 {
     TaskBase::cleanupHook();
+    destroyPipeline();
 }

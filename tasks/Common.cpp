@@ -62,13 +62,10 @@ void Common::errorHook()
 void Common::stopHook()
 {
     CommonBase::stopHook();
-    gst_element_set_state(GST_ELEMENT(mPipeline), GST_STATE_PAUSED);
 }
 void Common::cleanupHook()
 {
     CommonBase::cleanupHook();
-
-    destroyPipeline();
 }
 
 void Common::destroyPipeline()

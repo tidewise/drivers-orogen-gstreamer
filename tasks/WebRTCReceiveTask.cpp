@@ -111,6 +111,10 @@ void WebRTCReceiveTask::errorHook()
 }
 void WebRTCReceiveTask::stopHook()
 {
+    if (mPipeline) {
+        destroyPipeline();
+    }
+
     WebRTCReceiveTaskBase::stopHook();
 }
 void WebRTCReceiveTask::cleanupHook()

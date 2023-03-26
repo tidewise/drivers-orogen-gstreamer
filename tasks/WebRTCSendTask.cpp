@@ -90,11 +90,19 @@ void WebRTCSendTask::errorHook()
 }
 void WebRTCSendTask::stopHook()
 {
+    while (!m_peers.empty()) {
+        disconnectPeer(m_peers.begin());
+    }
+
     WebRTCSendTaskBase::stopHook();
+    gst_element_set_state(mPipeline, GST_STATE_PAUSED);
 }
+
 void WebRTCSendTask::cleanupHook()
 {
     WebRTCSendTaskBase::cleanupHook();
+
+    destroyPipeline();
 }
 
 GstElement* WebRTCSendTask::createPipeline()
