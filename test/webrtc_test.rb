@@ -20,7 +20,6 @@ describe OroGen.gstreamer.WebRTCCommonTask do
                 )
                 .deployed_as("gstreamer_webrtc_test_generator")
             add(OroGen.gstreamer.WebRTCSendTask, as: "send")
-                .deployed_as("gstreamer_webrtc_test_send")
             add(OroGen.gstreamer.WebRTCReceiveTask, as: "receive")
 
             generator_child.connect_to send_child
@@ -37,11 +36,6 @@ describe OroGen.gstreamer.WebRTCCommonTask do
 
     it "successfully establishes connection and transmits video when the sender is "\
        "polite and both of them have each other's peer ID" do
-        cmp_m = @cmp_m.use(
-            "receive" => OroGen.gstreamer.WebRTCReceiveTask
-                               .deployed_as("gstreamer_webrtc_test_receiver")
-                               .with_arguments(peer_id: "receiver")
-        )
         cmp = syskit_deploy(cmp_m)
         cmp.send_child.properties.signalling_config = {
             polite: false, self_peer_id: "sender", remote_peer_id: "receiver"
@@ -60,27 +54,13 @@ describe OroGen.gstreamer.WebRTCCommonTask do
 
     it "successfully sends data to two receivers with different peer IDs when the "\
        "receivers are polite" do
-        cmp1_m = @cmp_m.use(
-            "receive" => OroGen.gstreamer.WebRTCReceiveTask
-                               .deployed_as("gstreamer_webrtc_test_receive1")
-                               .with_arguments(peer_id: "receive1")
+        cmp1_m = cmp_m(
+            receiver: "r1", sender_polite: false, receiver_remote_peer_id: "sender"
         )
-        cmp2_m = @cmp_m.use(
-            "receive" => OroGen.gstreamer.WebRTCReceiveTask
-                               .deployed_as("gstreamer_webrtc_test_receive2")
-                               .with_arguments(peer_id: "receive2")
+        cmp2_m = cmp_m(
+            receiver: "r2", sender_polite: false, receiver_remote_peer_id: "sender"
         )
         cmp1, cmp2 = syskit_deploy(cmp1_m, cmp2_m)
-
-        cmp1.send_child.properties.signalling_config = {
-            polite: false, self_peer_id: "sender"
-        }
-        cmp1.receive_child.properties.signalling_config = {
-            polite: true, remote_peer_id: "sender"
-        }
-        cmp2.receive_child.properties.signalling_config = {
-            polite: true, remote_peer_id: "sender"
-        }
 
         syskit_configure_and_start(cmp1)
         syskit_configure_and_start(cmp2)
@@ -92,6 +72,25 @@ describe OroGen.gstreamer.WebRTCCommonTask do
 
         assert_has_transmission_succeeded(frames[0], frames[1])
         assert_has_transmission_succeeded(frames[0], frames[2])
+    end
+
+    def cmp_m(sender: "sender", receiver: "receiver", sender_remote_peer_id: nil, receiver_remote_peer_id: nil, sender_polite:)
+        @cmp_m.use(
+            "send" =>
+                OroGen.gstreamer.WebRTCSendTask
+                      .deployed_as("gstreamer_webrtc_test_#{sender}")
+                      .with_arguments(
+                          self_peer_id: sender, remote_peer_id: sender_remote_peer_id,
+                          polite: sender_polite
+                      ),
+            "receive" =>
+                OroGen.gstreamer.WebRTCReceiveTask
+                      .deployed_as("gstreamer_webrtc_test_#{receiver}")
+                      .with_arguments(
+                          self_peer_id: receiver, remote_peer_id: receiver_remote_peer_id,
+                          polite: !sender_polite
+                      )
+        )
     end
 
     def assert_has_transmission_succeeded(generator_frame, received_frame)
@@ -118,14 +117,18 @@ module Services
     end
 end
 
-Syskit.extend_model OroGen.gstreamer.WebRTCReceiveTask do
-    argument :peer_id
+Syskit.extend_model OroGen.gstreamer.WebRTCCommonTask do
+    argument :self_peer_id
+    argument :remote_peer_id, default: nil
+    argument :polite
 
     def update_properties
         super
 
         properties.signalling_config do |s|
-            s.self_peer_id = peer_id
+            s.self_peer_id = self_peer_id
+            s.remote_peer_id = remote_peer_id if remote_peer_id
+            s.polite = polite
             s
         end
     end
