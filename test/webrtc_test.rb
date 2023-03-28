@@ -2,6 +2,13 @@
 
 using_task_library "gstreamer"
 
+WEBRTC_CONNECTED_STATES = {
+    "signaling_state" => "GST_WEBRTC_SIGNALING_STATE_STABLE",
+    "peer_connection_state" => "GST_WEBRTC_PEER_CONNECTION_STATE_NEW",
+    "ice_connection_state" => "GST_WEBRTC_ICE_CONNECTION_STATE_CONNECTED",
+    "ice_gathering_state" => "GST_WEBRTC_ICE_GATHERING_STATE_COMPLETE"
+}.freeze
+
 describe OroGen.gstreamer.WebRTCCommonTask do
     run_live
 
@@ -34,21 +41,32 @@ describe OroGen.gstreamer.WebRTCCommonTask do
     after do
     end
 
-    it "successfully establishes connection and transmits video when the sender is "\
+    it "successfully establishes connection and transmits video when the receiver is "\
        "polite and both of them have each other's peer ID" do
-        cmp = syskit_deploy(cmp_m)
-        cmp.send_child.properties.signalling_config = {
-            polite: false, self_peer_id: "sender", remote_peer_id: "receiver"
-        }
-        cmp.receive_child.properties.signalling_config = {
-            polite: true, self_peer_id: "receiver", remote_peer_id: "sender"
-        }
+        cmp = syskit_deploy(
+            cmp_m(
+                sender_polite: false,
+                receiver_remote_peer_id: "sender",
+                sender_remote_peer_id: "receiver"
+            )
+        )
 
-        syskit_configure_and_start(cmp)
+        syskit_configure(cmp)
+        sender_stats_r = cmp.send_child.stats_port.reader
+        receiver_stats_r = cmp.receive_child.stats_port.reader
+        syskit_start(cmp)
+
         frames = expect_execution.to do
             [have_one_new_sample(cmp.generator_child.out_port),
              have_one_new_sample(cmp.receive_child.video_out_port)]
         end
+
+        s = sender_stats_r.read
+        s_expected = { "peer_id" => "receiver" }.merge(WEBRTC_CONNECTED_STATES)
+        r = receiver_stats_r.read
+        r_expected = { "peer_id" => "sender" }.merge(WEBRTC_CONNECTED_STATES)
+        assert_equal [s_expected], s.peers.map(&:to_simple_value)
+        assert_equal r_expected, r.to_simple_value
         assert_has_transmission_succeeded(frames[0], frames[1])
     end
 
@@ -62,14 +80,30 @@ describe OroGen.gstreamer.WebRTCCommonTask do
         )
         cmp1, cmp2 = syskit_deploy(cmp1_m, cmp2_m)
 
-        syskit_configure_and_start(cmp1)
-        syskit_configure_and_start(cmp2)
+        syskit_configure(cmp1)
+        syskit_configure(cmp2)
+        sender_stats_r = cmp1.send_child.stats_port.reader
+        r1_stats_r = cmp1.receive_child.stats_port.reader
+        r2_stats_r = cmp2.receive_child.stats_port.reader
+        syskit_start(cmp1)
+        syskit_start(cmp2)
+
         frames = expect_execution.to do
             [have_one_new_sample(cmp1.generator_child.out_port),
              have_one_new_sample(cmp1.receive_child.video_out_port),
              have_one_new_sample(cmp2.receive_child.video_out_port)]
         end
 
+        s = sender_stats_r.read
+        s1_expected = { "peer_id" => "r1" }.merge(WEBRTC_CONNECTED_STATES)
+        s2_expected = { "peer_id" => "r2" }.merge(WEBRTC_CONNECTED_STATES)
+        r1 = r1_stats_r.read
+        r2 = r2_stats_r.read
+        r_expected = { "peer_id" => "sender" }.merge(WEBRTC_CONNECTED_STATES)
+        assert_equal [s1_expected, s2_expected],
+                     s.peers.sort_by(&:peer_id).map(&:to_simple_value)
+        assert_equal r_expected, r1.to_simple_value
+        assert_equal r_expected, r2.to_simple_value
         assert_has_transmission_succeeded(frames[0], frames[1])
         assert_has_transmission_succeeded(frames[0], frames[2])
     end

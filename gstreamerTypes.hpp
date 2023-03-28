@@ -4,6 +4,9 @@
 #include <base/samples/Frame.hpp>
 #include <string>
 
+#define GST_USE_UNSTABLE_API
+#include <gst/webrtc/webrtc.h>
+
 namespace gstreamer {
     /** Description of an injection of images from an image input port to
      * the gstreamer pipeline
@@ -40,6 +43,21 @@ namespace gstreamer {
          * Leave empty if it will be known dynamically (if the component supports it)
          */
         std::string remote_peer_id;
+    };
+
+    struct WebRTCPeerStats {
+        std::string peer_id;
+        GstWebRTCSignalingState signaling_state = GST_WEBRTC_SIGNALING_STATE_STABLE;
+        GstWebRTCPeerConnectionState peer_connection_state =
+            GST_WEBRTC_PEER_CONNECTION_STATE_NEW;
+        GstWebRTCICEConnectionState ice_connection_state =
+            GST_WEBRTC_ICE_CONNECTION_STATE_NEW;
+        GstWebRTCICEGatheringState ice_gathering_state =
+            GST_WEBRTC_ICE_GATHERING_STATE_NEW;
+    };
+
+    struct WebRTCSendStats {
+        std::vector<WebRTCPeerStats> peers;
     };
 }
 

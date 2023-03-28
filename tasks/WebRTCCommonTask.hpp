@@ -33,18 +33,9 @@ namespace gstreamer {
         friend class WebRTCCommonTaskBase;
 
     protected:
-        struct Peer {
-            std::string peer_id;
+        struct Peer : WebRTCPeerStats {
             GstElement* webrtcbin = nullptr;
             WebRTCCommonTask* task = nullptr;
-
-            GstWebRTCSignalingState signaling_state = GST_WEBRTC_SIGNALING_STATE_STABLE;
-            GstWebRTCPeerConnectionState peer_connection_state =
-                GST_WEBRTC_PEER_CONNECTION_STATE_NEW;
-            GstWebRTCICEConnectionState ice_connection_state =
-                GST_WEBRTC_ICE_CONNECTION_STATE_NEW;
-            GstWebRTCICEGatheringState ice_gathering_state =
-                GST_WEBRTC_ICE_GATHERING_STATE_NEW;
         };
 
         typedef std::map<GstElement*, Peer> PeerMap;
@@ -112,6 +103,8 @@ namespace gstreamer {
         void waitForMessage(std::function<bool(webrtc_base::SignallingMessage const&)> f,
             base::Time const& timeout = base::Time::fromSeconds(2),
             base::Time const& poll_period = base::Time::fromMilliseconds(10));
+
+        virtual void updatePeersStats() = 0;
 
     public:
         /** TaskContext constructor for WebRTCCommonTask

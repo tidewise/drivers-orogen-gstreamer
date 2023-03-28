@@ -33,8 +33,10 @@ namespace gstreamer {
         void disconnectPeer(PeerMap::iterator peer_it);
         void configurePeer(std::string const& peer_id);
         void destroyPipeline() override;
+        void updatePeersStats() override;
 
-        void processSignallingMessage(webrtc_base::SignallingMessage const& message) override;
+        void processSignallingMessage(
+            webrtc_base::SignallingMessage const& message) override;
         void handlePeerDisconnection(std::string const& peer_id) override;
 
         struct DynamicElements {

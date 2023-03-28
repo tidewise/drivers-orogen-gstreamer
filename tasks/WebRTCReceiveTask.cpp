@@ -96,6 +96,18 @@ void WebRTCReceiveTask::processSignallingMessage(SignallingMessage const& messag
     WebRTCCommonTask::processSignallingMessage(webrtcbin, message);
 }
 
+void WebRTCReceiveTask::updatePeersStats()
+{
+    WebRTCPeerStats stats;
+    if (!m_peers.empty()) {
+        auto& peer = *m_peers.begin();
+        _stats.write(peer.second);
+    }
+    else {
+        _stats.write(WebRTCPeerStats());
+    }
+}
+
 void WebRTCReceiveTask::handlePeerDisconnection(std::string const& peer_id)
 {
     if (peer_id != getCurrentPeer()) {

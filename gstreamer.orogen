@@ -5,7 +5,7 @@ name "gstreamer"
 using_library "base-logging", typekit: false
 using_library "gstreamer-video-1.0", typekit: false
 using_library "gstreamer-app-1.0", typekit: false
-using_library "gstreamer-webrtc-1.0", typekit: false
+using_library "gstreamer-webrtc-1.0", typekit: true, typekit_link: false
 
 import_types_from "gstreamerTypes.hpp"
 import_types_from "std"
@@ -92,7 +92,9 @@ end
 
 task_context "WebRTCReceiveTask", subclasses: "WebRTCCommonTask" do
     property "frame_mode", "/base/samples/frame/frame_mode_t", "MODE_RGB"
+
     output_port "video_out", ro_ptr("/base/samples/frame/Frame")
+    output_port "stats", "/gstreamer/WebRTCPeerStats"
 
     port_driven
 end

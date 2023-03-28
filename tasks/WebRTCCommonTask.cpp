@@ -74,10 +74,12 @@ void WebRTCCommonTask::updateHook()
         }
         else if (message.type == SIGNALLING_PEER_DISCONNECTED) {
             handlePeerDisconnection(message.from);
+            updatePeersStats();
             return;
         }
 
         processSignallingMessage(message);
+        updatePeersStats();
     }
 }
 
@@ -287,6 +289,7 @@ void WebRTCCommonTask::callbackSignalingStateChange(GstElement* webrtcbin,
     auto& peer(*reinterpret_cast<WebRTCCommonTask::Peer*>(user_data));
     g_object_get(webrtcbin, "signaling-state", &peer.signaling_state, NULL);
     LOG_INFO_S << "Signaling state change: " << peer.signaling_state;
+    peer.task->updatePeersStats();
 }
 
 void WebRTCCommonTask::callbackConnectionStateChange(GstElement* webrtcbin,
@@ -296,6 +299,7 @@ void WebRTCCommonTask::callbackConnectionStateChange(GstElement* webrtcbin,
     auto& peer(*reinterpret_cast<WebRTCCommonTask::Peer*>(user_data));
     g_object_get(webrtcbin, "connection-state", &peer.peer_connection_state, NULL);
     LOG_INFO_S << "Peer connection state change: " << peer.peer_connection_state;
+    peer.task->updatePeersStats();
 }
 
 void WebRTCCommonTask::callbackICEConnectionStateChange(GstElement* webrtcbin,
@@ -305,6 +309,7 @@ void WebRTCCommonTask::callbackICEConnectionStateChange(GstElement* webrtcbin,
     auto& peer(*reinterpret_cast<WebRTCCommonTask::Peer*>(user_data));
     g_object_get(webrtcbin, "ice-connection-state", &peer.ice_connection_state, NULL);
     LOG_INFO_S << "ICE Connection state" << peer.ice_connection_state;
+    peer.task->updatePeersStats();
 }
 
 void WebRTCCommonTask::callbackICEGatheringStateChange(GstElement* webrtcbin,
@@ -314,6 +319,7 @@ void WebRTCCommonTask::callbackICEGatheringStateChange(GstElement* webrtcbin,
     auto& peer(*reinterpret_cast<WebRTCCommonTask::Peer*>(user_data));
     g_object_get(webrtcbin, "ice-gathering-state", &peer.ice_gathering_state, NULL);
     LOG_INFO_S << "ICE Gathering state" << peer.ice_gathering_state;
+    peer.task->updatePeersStats();
 }
 
 void WebRTCCommonTask::configureWebRTCBin(string const& peer_id, GstElement* webrtcbin)

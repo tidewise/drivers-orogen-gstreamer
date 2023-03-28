@@ -190,3 +190,12 @@ void WebRTCSendTask::destroyPipeline()
 
     WebRTCSendTaskBase::destroyPipeline();
 }
+
+void WebRTCSendTask::updatePeersStats()
+{
+    WebRTCSendStats stats;
+    for (auto const& p : m_peers) {
+        stats.peers.push_back(WebRTCPeerStats(p.second));
+    }
+    _stats.write(stats);
+}

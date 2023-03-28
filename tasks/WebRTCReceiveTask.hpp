@@ -30,6 +30,8 @@ namespace gstreamer {
         friend class WebRTCReceiveTaskBase;
 
     protected:
+        void updatePeersStats() override;
+
         std::string getCurrentPeer() const;
         GstElement* createPipeline(std::string const& peer_id = "");
 
