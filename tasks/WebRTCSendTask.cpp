@@ -50,7 +50,7 @@ void WebRTCSendTask::processSignallingMessage(SignallingMessage const& message)
 {
     LOG_INFO_S << "Signalling: " << message.type << " from " << message.from << ": "
                << message.message;
-    auto sig_config = _signalling_config.get();
+    auto sig_config = _signalling.get();
     if (!sig_config.remote_peer_id.empty() && sig_config.remote_peer_id != message.from) {
         LOG_ERROR_S << "Received signalling message from " + message.from +
                            " but this component is configured to establish "
@@ -78,7 +78,7 @@ void WebRTCSendTask::processSignallingMessage(SignallingMessage const& message)
         return;
     }
     else if (message.type == SIGNALLING_OFFER) {
-        auto sig_config = _signalling_config.get();
+        auto sig_config = _signalling.get();
         if (!sig_config.polite) {
             LOG_ERROR_S << "Received offer, but polite is false";
             return;

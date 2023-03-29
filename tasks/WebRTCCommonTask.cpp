@@ -25,7 +25,7 @@ bool WebRTCCommonTask::configureHook()
     if (!WebRTCCommonTaskBase::configureHook())
         return false;
 
-    m_signalling_config = _signalling_config.get();
+    m_signalling_config = _signalling.get();
     return true;
 }
 bool WebRTCCommonTask::startHook()

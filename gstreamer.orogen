@@ -71,7 +71,7 @@ task_context "WebRTCCommonTask", subclasses: "Common" do
     abstract
 
     # Configuration of the signalling process
-    property "signalling_config", "/gstreamer/SignallingConfig"
+    property "signalling", "/gstreamer/SignallingConfig"
 
     # Reception of WebRTC signalling messages
     input_port("signalling_in", "/webrtc_base/SignallingMessage")

@@ -287,7 +287,7 @@ Syskit.extend_model OroGen.gstreamer.WebRTCCommonTask do
     def update_properties
         super
 
-        properties.signalling_config do |s|
+        properties.signalling do |s|
             s.self_peer_id = self_peer_id
             s.remote_peer_id = remote_peer_id if remote_peer_id
             s.polite = polite
