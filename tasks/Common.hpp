@@ -47,19 +47,14 @@ namespace gstreamer {
         typedef base::samples::frame::frame_mode_t FrameMode;
 
         template <typename Port> struct ConfiguredPort {
-            bool dynamic;
-            Common& task;
             ROPtrFrame frame;
+            Common* task;
             Port* port;
             FrameMode frameMode;
 
-            ConfiguredPort(bool dynamic,
-                Common&,
-                Port*,
+            ConfiguredPort(Common&,
+                Port&,
                 FrameMode frameMode = base::samples::frame::MODE_UNDEFINED);
-            ConfiguredPort(ConfiguredPort const&) = delete;
-            ConfiguredPort(ConfiguredPort&&);
-            ~ConfiguredPort();
         };
 
         struct ConfiguredInput : ConfiguredPort<FrameInputPort> {
@@ -68,7 +63,7 @@ namespace gstreamer {
             uint32_t width = 0;
             uint32_t height = 0;
 
-            ConfiguredInput(bool dynamic, GstElement*, Common&, FrameInputPort*);
+            ConfiguredInput(Common&, FrameInputPort&, GstElement*);
         };
         typedef ConfiguredPort<FrameOutputPort> ConfiguredOutput;
 
@@ -95,6 +90,23 @@ namespace gstreamer {
         static GstFlowReturn sinkNewSample(GstElement* sink, ConfiguredOutput* data);
         bool processInputs();
         bool pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
+
+        class DynamicPort {
+            RTT::TaskContext* m_task = nullptr;
+            RTT::base::PortInterface* m_port = nullptr;
+
+        public:
+            DynamicPort(RTT::TaskContext* task,
+                RTT::base::InputPortInterface* port,
+                bool event);
+            DynamicPort(RTT::TaskContext* task, RTT::base::OutputPortInterface* port);
+            DynamicPort(DynamicPort const&) = delete;
+            DynamicPort(DynamicPort&&);
+            ~DynamicPort();
+
+            RTT::base::PortInterface* get();
+        };
+        std::vector<DynamicPort> m_dynamic_ports;
 
     public:
         /** TaskContext constructor for Common

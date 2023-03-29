@@ -31,7 +31,7 @@ describe OroGen.gstreamer.Task do
             .with_arguments(
                 inputs: [{ name: "in" }],
                 pipeline: <<~PIPELINE
-                    appsrc name=in ! queue ! videoflip method=vertical-flip !
+                    appsrc format=3 name=in ! queue ! videoflip method=vertical-flip !
                         rtpvrawpay ! udpsink host=127.0.0.1 port=9384
                 PIPELINE
             )

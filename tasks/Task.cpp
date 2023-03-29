@@ -23,34 +23,23 @@ Task::~Task()
 // hooks defined by Orocos::RTT. See Task.hpp for more detailed
 // documentation about them.
 
-void Task::verifyNoNameCollision()
-{
-    set<string> names;
-    for (auto const& p : _inputs.get()) {
-        if (!names.insert(p.name).second) {
-            throw std::runtime_error("duplicate port name " + p.name);
-        }
-    }
-
-    for (auto const& p : _outputs.get()) {
-        if (!names.insert(p.name).second) {
-            throw std::runtime_error("duplicate port name " + p.name);
-        }
-    }
-}
-
 bool Task::configureHook()
 {
     if (!TaskBase::configureHook())
         return false;
 
-    verifyNoNameCollision();
     auto* pipeline = constructPipeline();
     GstUnrefGuard<GstElement> unref_guard(pipeline);
 
-    configureInputs(pipeline);
-    configureOutputs(pipeline);
+    auto in_ports = configureInputs(pipeline);
+    auto out_ports = configureOutputs(pipeline);
 
+    for (auto& p : in_ports) {
+        m_dynamic_ports.emplace_back(move(p));
+    }
+    for (auto& p : out_ports) {
+        m_dynamic_ports.emplace_back(move(p));
+    }
     mPipeline = unref_guard.release();
     return true;
 }
@@ -70,30 +59,42 @@ GstElement* Task::constructPipeline()
     return element;
 }
 
-void Task::configureInputs(GstElement* pipeline)
+std::vector<Task::DynamicPort> Task::configureInputs(GstElement* pipeline)
 {
     auto config = _inputs.get();
+    std::vector<DynamicPort> ports;
     for (auto const& inputConfig : config) {
+        if (provides()->hasService(inputConfig.name)) {
+            throw std::runtime_error("name collision in input port creation: " +
+                                     inputConfig.name + " already exists");
+        }
         unique_ptr<FrameInputPort> port(new FrameInputPort(inputConfig.name));
         configureInput(pipeline, inputConfig.name, true, *port);
-        ports()->addEventPort(inputConfig.name, *port);
-        port.release();
+        ports.emplace_back(DynamicPort(this, port.release(), true));
     }
+
+    return ports;
 }
 
-void Task::configureOutputs(GstElement* pipeline)
+std::vector<Task::DynamicPort> Task::configureOutputs(GstElement* pipeline)
 {
     auto config = _outputs.get();
+    std::vector<DynamicPort> ports;
     for (auto const& outputConfig : config) {
+        if (provides()->hasService(outputConfig.name)) {
+            throw std::runtime_error("name collision in output port creation: " +
+                                     outputConfig.name + " already exists");
+        }
         unique_ptr<FrameOutputPort> port(new FrameOutputPort(outputConfig.name));
         configureOutput(pipeline,
             outputConfig.name,
             outputConfig.frame_mode,
             true,
             *port);
-        ports()->addPort(outputConfig.name, *port);
-        port.release();
+        ports.emplace_back(DynamicPort(this, port.release()));
     }
+
+    return ports;
 }
 
 bool Task::startHook()
@@ -120,6 +121,7 @@ void Task::stopHook()
 }
 void Task::cleanupHook()
 {
-    TaskBase::cleanupHook();
     destroyPipeline();
+
+    TaskBase::cleanupHook();
 }

@@ -26,9 +26,8 @@ namespace gstreamer {
     protected:
         GstElement* constructPipeline();
 
-        void verifyNoNameCollision();
-        void configureInputs(GstElement* pipeline);
-        void configureOutputs(GstElement* pipeline);
+        std::vector<DynamicPort> configureInputs(GstElement* pipeline);
+        std::vector<DynamicPort> configureOutputs(GstElement* pipeline);
 
     public:
         /** TaskContext constructor for Task

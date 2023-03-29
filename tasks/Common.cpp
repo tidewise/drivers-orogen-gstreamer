@@ -24,6 +24,8 @@ bool Common::configureHook()
 {
     if (!CommonBase::configureHook())
         return false;
+
+    m_dynamic_ports.clear();
     return true;
 }
 bool Common::startHook()
@@ -69,6 +71,8 @@ void Common::stopHook()
 }
 void Common::cleanupHook()
 {
+    m_dynamic_ports.clear();
+
     CommonBase::cleanupHook();
 }
 
@@ -136,8 +140,7 @@ void Common::configureOutput(GstElement* pipeline,
     GstUnrefGuard<GstCaps> caps_unref_guard(caps);
     g_object_set(appsink, "emit-signals", TRUE, "caps", caps, NULL);
 
-    mConfiguredOutputs.emplace_back(
-        std::move(ConfiguredOutput(dynamic, *this, &port, frame_mode)));
+    mConfiguredOutputs.push_back(ConfiguredOutput(*this, port, frame_mode));
 
     port.setDataSample(mConfiguredOutputs.back().frame);
     g_signal_connect(appsink,
@@ -159,8 +162,7 @@ void Common::configureInput(GstElement* pipeline,
     GstUnrefGuard<GstElement> refguard(appsrc);
     g_object_set(appsrc, "is-live", TRUE, NULL);
 
-    mConfiguredInputs.emplace_back(
-        std::move(ConfiguredInput(dynamic, appsrc, *this, &port)));
+    mConfiguredInputs.push_back(ConfiguredInput(*this, port, appsrc));
 }
 
 void Common::queueError(std::string const& message)
@@ -301,7 +303,7 @@ GstFlowReturn Common::sinkNewSample(GstElement* sink, Common::ConfiguredOutput* 
 
     uint8_t* pixels = &(frame->image[0]);
     if (frame->getNumberOfBytes() > mapInfo.size) {
-        data->task.queueError(
+        data->task->queueError(
             "Inconsistent number of bytes. Rock's image type calculated " +
             to_string(frame->getNumberOfBytes()) + " while GStreamer only has " +
             to_string(mapInfo.size));
@@ -326,13 +328,11 @@ GstFlowReturn Common::sinkNewSample(GstElement* sink, Common::ConfiguredOutput* 
 }
 
 template <typename Port>
-Common::ConfiguredPort<Port>::ConfiguredPort(bool dynamic,
-    Common& task,
-    Port* port,
+Common::ConfiguredPort<Port>::ConfiguredPort(Common& task,
+    Port& port,
     FrameMode frameMode)
-    : dynamic(dynamic)
-    , task(task)
-    , port(port)
+    : task(&task)
+    , port(&port)
     , frameMode(frameMode)
 {
     Frame* f = new Frame();
@@ -340,30 +340,53 @@ Common::ConfiguredPort<Port>::ConfiguredPort(bool dynamic,
     frame.reset(f);
 }
 
-template <typename Port>
-Common::ConfiguredPort<Port>::ConfiguredPort(ConfiguredPort&& other)
-    : dynamic(other.dynamic)
-    , task(other.task)
-    , frame(other.frame.write_access())
-    , port(other.port)
-    , frameMode(other.frameMode)
+Common::ConfiguredInput::ConfiguredInput(Common& task,
+    Common::FrameInputPort& port,
+    GstElement* appsrc)
+    : ConfiguredPort<Common::FrameInputPort>(task, port)
+    , appsrc(appsrc)
 {
-    other.port = nullptr;
 }
 
-template <typename Port> Common::ConfiguredPort<Port>::~ConfiguredPort()
+Common::DynamicPort::DynamicPort(RTT::TaskContext* task,
+    RTT::base::InputPortInterface* port,
+    bool event)
+    : m_task(task)
+    , m_port(port)
 {
-    if (port && dynamic) {
-        task.ports()->removePort(port->getName());
-        delete port;
+    if (event) {
+        task->ports()->addEventPort(port->getName(), *port);
+    }
+    else {
+        task->ports()->addPort(port->getName(), *port);
     }
 }
 
-Common::ConfiguredInput::ConfiguredInput(bool dynamic,
-    GstElement* appsrc,
-    Common& task,
-    Common::FrameInputPort* port)
-    : ConfiguredPort<Common::FrameInputPort>(dynamic, task, port)
-    , appsrc(appsrc)
+Common::DynamicPort::DynamicPort(RTT::TaskContext* task,
+    RTT::base::OutputPortInterface* port)
+    : m_task(task)
+    , m_port(port)
 {
+    task->ports()->addPort(port->getName(), *port);
+}
+
+Common::DynamicPort::DynamicPort(DynamicPort&& src)
+{
+    m_task = src.m_task;
+    m_port = src.m_port;
+    src.m_task = nullptr;
+    src.m_port = nullptr;
+}
+
+Common::DynamicPort::~DynamicPort()
+{
+    if (m_port) {
+        m_task->ports()->removePort(m_port->getName());
+    }
+    delete m_port;
+}
+
+RTT::base::PortInterface* Common::DynamicPort::get()
+{
+    return m_port;
 }
