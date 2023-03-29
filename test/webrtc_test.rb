@@ -66,14 +66,11 @@ describe OroGen.gstreamer.WebRTCCommonTask do
             assert_same cmp.send_child, sender
 
             syskit_configure_and_start(cmp)
-            frames = expect_execution.to do
-                [have_one_new_sample(cmp.send_child.generator_out_port),
-                 have_one_new_sample(cmp.receive_child.video_out_port),
-                 receiver_has_connection_established(self, cmp.receive_child, "sender"),
-                 sender_has_all_connections_established(self, cmp.send_child, ["receiver"])]
+            expect_execution.to do
+                have_successful_transmission(self, cmp)
+                receiver_has_connection_established(self, cmp.receive_child, "sender")
+                sender_has_all_connections_established(self, cmp.send_child, ["receiver"])
             end
-
-            assert_has_transmission_succeeded(frames[0], frames[1])
         end
 
         it "establishes connection if the receiver is started first" do
@@ -90,14 +87,11 @@ describe OroGen.gstreamer.WebRTCCommonTask do
             assert_same cmp.receive_child, receiver
 
             syskit_configure_and_start(cmp)
-            frames = expect_execution.to do
-                [have_one_new_sample(cmp.send_child.generator_out_port),
-                 have_one_new_sample(cmp.receive_child.video_out_port),
-                 receiver_has_connection_established(self, cmp.receive_child, "sender"),
-                 sender_has_all_connections_established(self, cmp.send_child, ["receiver"])]
+            expect_execution.to do
+                have_successful_transmission(self, cmp)
+                receiver_has_connection_established(self, cmp.receive_child, "sender")
+                sender_has_all_connections_established(self, cmp.send_child, ["receiver"])
             end
-
-            assert_has_transmission_succeeded(frames[0], frames[1])
         end
     end
 
@@ -112,14 +106,11 @@ describe OroGen.gstreamer.WebRTCCommonTask do
             assert_same cmp.send_child, sender
 
             syskit_configure_and_start(cmp)
-            frames = expect_execution.to do
-                [have_one_new_sample(cmp.send_child.generator_out_port),
-                 have_one_new_sample(cmp.receive_child.video_out_port),
-                 receiver_has_connection_established(self, cmp.receive_child, "sender"),
-                 sender_has_all_connections_established(self, cmp.send_child, ["receiver"])]
+            expect_execution.to do
+                have_successful_transmission(self, cmp)
+                receiver_has_connection_established(self, cmp.receive_child, "sender")
+                sender_has_all_connections_established(self, cmp.send_child, ["receiver"])
             end
-
-            assert_has_transmission_succeeded(frames[0], frames[1])
         end
 
         it "establishes connection if the receiver is started first" do
@@ -132,14 +123,11 @@ describe OroGen.gstreamer.WebRTCCommonTask do
             assert_same cmp.receive_child, receiver
 
             syskit_configure_and_start(cmp)
-            frames = expect_execution.to do
-                [have_one_new_sample(cmp.send_child.generator_out_port),
-                 have_one_new_sample(cmp.receive_child.video_out_port),
-                 receiver_has_connection_established(self, cmp.receive_child, "sender"),
-                 sender_has_all_connections_established(self, cmp.send_child, ["receiver"])]
+            expect_execution.to do
+                have_successful_transmission(self, cmp)
+                receiver_has_connection_established(self, cmp.receive_child, "sender")
+                sender_has_all_connections_established(self, cmp.send_child, ["receiver"])
             end
-
-            assert_has_transmission_succeeded(frames[0], frames[1])
         end
 
         it "establishes connection with two receivers, startup sandwiched" do
@@ -154,24 +142,17 @@ describe OroGen.gstreamer.WebRTCCommonTask do
             cmp2_m = cmp_m(
                 receiver: "r2", sender_polite: false, receiver_remote_peer_id: "sender"
             )
-            r2_m = self.receiver_m(
-                polite: true, self_peer_id: "r1", remote_peer_id: "sender"
-            )
             cmp1, cmp2 = syskit_deploy(cmp1_m, cmp2_m)
             syskit_configure_and_start(cmp1)
             syskit_configure_and_start(cmp2)
 
-            frames = expect_execution.to do
-                [have_one_new_sample(cmp1.send_child.generator_out_port),
-                 have_one_new_sample(cmp1.receive_child.video_out_port),
-                 have_one_new_sample(cmp2.receive_child.video_out_port),
-                 receiver_has_connection_established(self, cmp1.receive_child, "sender"),
-                 receiver_has_connection_established(self, cmp2.receive_child, "sender"),
-                 sender_has_all_connections_established(self, cmp1.send_child, %w[r1 r2])]
+            expect_execution.to do
+                have_successful_transmission(self, cmp1)
+                have_successful_transmission(self, cmp2)
+                receiver_has_connection_established(self, cmp1.receive_child, "sender")
+                receiver_has_connection_established(self, cmp2.receive_child, "sender")
+                sender_has_all_connections_established(self, cmp1.send_child, %w[r1 r2])
             end
-
-            assert_has_transmission_succeeded(frames[0], frames[1])
-            assert_has_transmission_succeeded(frames[0], frames[2])
         end
     end
 
@@ -191,9 +172,8 @@ describe OroGen.gstreamer.WebRTCCommonTask do
         syskit_start(cmp2)
 
         expect_execution.to do
-            [have_one_new_sample(cmp1.send_child.generator_out_port),
-             have_one_new_sample(cmp1.receive_child.video_out_port),
-             have_one_new_sample(cmp2.receive_child.video_out_port)]
+            have_successful_transmission(self, cmp1)
+            have_successful_transmission(self, cmp2)
         end
 
         plan.unmark_mission_task(cmp2)
@@ -206,11 +186,7 @@ describe OroGen.gstreamer.WebRTCCommonTask do
         assert_equal [s1_expected],
                      s.peers.sort_by(&:peer_id).map(&:to_simple_value)
 
-        frames = expect_execution.to do
-            [have_one_new_sample(cmp1.send_child.generator_out_port),
-             have_one_new_sample(cmp1.receive_child.video_out_port)]
-        end
-        assert_has_transmission_succeeded(frames[0], frames[1])
+        expect_execution.to { have_successful_transmission(self, cmp1) }
     end
 
     def sender_m(self_peer_id: "sender", remote_peer_id: nil, polite:)
@@ -265,7 +241,23 @@ describe OroGen.gstreamer.WebRTCCommonTask do
             p.ice_connection_state == :GST_WEBRTC_ICE_CONNECTION_STATE_CONNECTED
     end
 
-    def assert_has_transmission_succeeded(generator_frame, received_frame)
+    def read_expected_frame(cmp)
+        expect_execution.to do
+            have_one_new_sample(cmp.send_child.generator_out_port)
+        end
+    end
+
+    def have_successful_transmission(expectations, cmp) # rubocop:disable Naming/PredicateName
+        expected = nil
+        expectations
+            .have_one_new_sample(cmp.send_child.generator_out_port)
+            .matching { |f| expected = f }
+        expectations
+            .have_one_new_sample(cmp.receive_child.video_out_port)
+            .matching { |f| expected && transmission_succeeded?(expected, f) }
+    end
+
+    def transmission_succeeded?(generator_frame, received_frame)
         abs_sum =
             generator_frame
             .image
@@ -273,9 +265,7 @@ describe OroGen.gstreamer.WebRTCCommonTask do
             .map { |a, b| (a - b).abs }
             .inject(&:+)
         mean_abs_sum = Float(abs_sum) / generator_frame.image.size
-        assert(mean_abs_sum < 10,
-               "expected the mean abs sum of source and received images to be less "\
-               "than 10, but is #{mean_abs_sum}")
+        mean_abs_sum < 10
     end
 end
 
