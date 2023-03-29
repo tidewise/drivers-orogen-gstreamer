@@ -63,21 +63,38 @@ task_context "Task", subclasses: "Common" do
     port_driven
 end
 
+# Common support for WebRTC
+#
+# This task's implementation is private and not meant to be reused outside
+# of the gstreamer orogen project.
 task_context "WebRTCCommonTask", subclasses: "Common" do
     abstract
 
+    # Configuration of the signalling process
     property "signalling_config", "/gstreamer/SignallingConfig"
 
+    # Reception of WebRTC signalling messages
     input_port("signalling_in", "/webrtc_base/SignallingMessage")
         .needs_reliable_connection
         .multiplexes
-
+    # WebRTC signalling messages sent by the component
     output_port "signalling_out", "/webrtc_base/SignallingMessage"
 
     port_driven
 end
 
+# Sender-only video webrtc peer
+#
+# This component allows to send a single video stream through WebRTC. It
+# supports having multiple receivers.
+#
+# The video stream must be available on start, even if there are no peers.
 task_context "WebRTCSendTask", subclasses: "WebRTCCommonTask" do
+    # GStreamer pipeline definition that encodes the video_in stream to a RTP
+    # stream that webrtc can ingest directly
+    #
+    # This pipeline is shared across all webrtc clients, i.e. the
+    # encoding will happen only once
     property "encoding_pipeline", "string", <<~GST_PIPELINE
         videoconvert !
         x264enc bitrate=2000 cabac=true !
@@ -91,7 +108,9 @@ task_context "WebRTCSendTask", subclasses: "WebRTCCommonTask" do
     port_driven
 end
 
+# Receiver-only video webrtc peer
 task_context "WebRTCReceiveTask", subclasses: "WebRTCCommonTask" do
+    # Frame mode of the output video
     property "frame_mode", "/base/samples/frame/frame_mode_t", "MODE_RGB"
 
     output_port "video_out", ro_ptr("/base/samples/frame/Frame")
