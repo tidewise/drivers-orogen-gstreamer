@@ -33,21 +33,11 @@ bool WebRTCCommonTask::startHook()
     if (!WebRTCCommonTaskBase::startHook())
         return false;
 
-    auto config = _signalling_config.get();
+    m_last_offer_request = base::Time();
 
-    SignallingMessage message;
-    message.type = SIGNALLING_NEW_PEER;
-    message.from = config.self_peer_id;
-    _signalling_out.write(message);
-
-    if (!config.remote_peer_id.empty()) {
-        if (config.polite) {
-            SignallingMessage message;
-            message.type = SIGNALLING_REQUEST_OFFER;
-            message.from = config.self_peer_id;
-            message.to = config.remote_peer_id;
-            _signalling_out.write(message);
-        }
+    auto config = m_signalling_config;
+    if (config.polite && !config.remote_peer_id.empty()) {
+        handleOfferRequestTimeout();
     }
     return true;
 }
@@ -55,22 +45,47 @@ void WebRTCCommonTask::updateHook()
 {
     WebRTCCommonTaskBase::updateHook();
 
+    readSignallingIn();
+    handleNegotiationTimeouts();
+
+    auto config = m_signalling_config;
+    if (config.polite && !config.remote_peer_id.empty() &&
+        !hasPeerID(config.remote_peer_id)) {
+        LOG_INFO_S << "HAS PEER " << hasPeerID(config.remote_peer_id);
+        handleOfferRequestTimeout();
+    }
+}
+
+void WebRTCCommonTask::readSignallingIn()
+{
+    auto config = m_signalling_config;
+    LOG_INFO_S << "Processing signalling messages";
+
     webrtc_base::SignallingMessage message;
     while (_signalling_in.read(message) == RTT::NewData) {
-        if (!message.to.empty() && message.to != m_signalling_config.self_peer_id) {
+        if (!message.to.empty() && message.to != config.self_peer_id) {
+            LOG_INFO_S << "Received signalling message for " << message.to << " on peer "
+                       << config.self_peer_id;
             continue;
         }
-        else if (message.type == SIGNALLING_NEW_PEER) {
-            continue;
+        else if (!config.remote_peer_id.empty()) {
+            if (message.from != config.remote_peer_id) {
+                LOG_INFO_S << "Received signalling message from " << message.from
+                           << " but remote_peer_id is set to " << config.remote_peer_id;
+                continue;
+            }
         }
-        else if (message.type == SIGNALLING_PEER_DISCONNECT) {
+
+        if (message.type == SIGNALLING_PEER_DISCONNECT) {
             SignallingMessage ack;
-            ack.from = m_signalling_config.self_peer_id;
+            ack.from = config.self_peer_id;
+            ack.to = message.from;
             ack.type = SIGNALLING_PEER_DISCONNECTED;
-            ack.message = message.from;
             _signalling_out.write(ack);
 
             handlePeerDisconnection(message.from);
+            updatePeersStats();
+            return;
         }
         else if (message.type == SIGNALLING_PEER_DISCONNECTED) {
             handlePeerDisconnection(message.from);
@@ -78,8 +93,57 @@ void WebRTCCommonTask::updateHook()
             return;
         }
 
+        auto peer_it = findPeerByID(message.from);
+        if (peer_it != m_peers.end()) {
+            peer_it->second.last_signalling_message = base::Time::now();
+        }
+
         processSignallingMessage(message);
         updatePeersStats();
+    }
+}
+
+void WebRTCCommonTask::handleOfferRequestTimeout()
+{
+    auto config = m_signalling_config;
+    if (!config.polite || config.remote_peer_id.empty()) {
+        return;
+    }
+
+    if (base::Time::now() - m_last_offer_request < config.offer_request_timeout) {
+        return;
+    }
+
+    LOG_INFO_S << "Sending offer request to peer '" << config.remote_peer_id << "'";
+
+    SignallingMessage request_msg;
+    request_msg.type = SIGNALLING_REQUEST_OFFER;
+    request_msg.from = config.self_peer_id;
+    request_msg.to = config.remote_peer_id;
+    _signalling_out.write(request_msg);
+    m_last_offer_request = base::Time::now();
+}
+
+void WebRTCCommonTask::handleNegotiationTimeouts()
+{
+    vector<string> timed_out_peers;
+    for (auto& peer_map : m_peers) {
+        auto& p = peer_map.second;
+        if (!p.connection_start.isNull()) {
+            continue;
+        }
+
+        if ((p.last_signalling_message - base::Time::now()) >
+                m_signalling_config.messaging_timeout ||
+            (p.negotiation_start - base::Time::now()) >
+                m_signalling_config.negotiation_timeout) {
+            LOG_INFO_S << "Peer " << p.peer_id << " negotiation timeout";
+            timed_out_peers.push_back(p.peer_id);
+        }
+    }
+
+    for (auto peer_id : timed_out_peers) {
+        handlePeerDisconnection(peer_id);
     }
 }
 
@@ -282,6 +346,19 @@ void WebRTCCommonTask::onICECandidate(Peer const& peer,
     _signalling_out.write(msg);
 }
 
+void WebRTCCommonTask::webrtcStateChange(Peer& peer)
+{
+    if (peer.connection_start.isNull() &&
+        peer.ice_connection_state == GST_WEBRTC_ICE_CONNECTION_STATE_CONNECTED) {
+        peer.connection_start = base::Time::now();
+    }
+
+    if (isPeerDisconnected(peer)) {
+        handlePeerDisconnection(peer.peer_id);
+    }
+
+    updatePeersStats();
+}
 void WebRTCCommonTask::callbackSignalingStateChange(GstElement* webrtcbin,
     GParamSpec* pspec,
     gpointer user_data)
@@ -308,8 +385,7 @@ void WebRTCCommonTask::callbackICEConnectionStateChange(GstElement* webrtcbin,
 {
     auto& peer(*reinterpret_cast<WebRTCCommonTask::Peer*>(user_data));
     g_object_get(webrtcbin, "ice-connection-state", &peer.ice_connection_state, NULL);
-    LOG_INFO_S << "ICE Connection state" << peer.ice_connection_state;
-    peer.task->updatePeersStats();
+    peer.task->webrtcStateChange(peer);
 }
 
 void WebRTCCommonTask::callbackICEGatheringStateChange(GstElement* webrtcbin,
@@ -328,6 +404,8 @@ void WebRTCCommonTask::configureWebRTCBin(string const& peer_id, GstElement* web
     peer.peer_id = peer_id;
     peer.task = this;
     peer.webrtcbin = webrtcbin;
+    peer.negotiation_start = base::Time::now();
+    peer.last_signalling_message = base::Time::now();
 
     g_signal_connect(webrtcbin,
         "notify::signaling-state",
@@ -362,6 +440,12 @@ void WebRTCCommonTask::destroyPipeline()
     m_peers.clear();
 }
 
+WebRTCCommonTask::PeerMap::const_iterator WebRTCCommonTask::findPeerByID(
+    std::string const& peer_id) const
+{
+    return const_cast<WebRTCCommonTask*>(this)->findPeerByID(peer_id);
+}
+
 WebRTCCommonTask::PeerMap::iterator WebRTCCommonTask::findPeerByID(
     std::string const& peer_id)
 {
@@ -370,6 +454,11 @@ WebRTCCommonTask::PeerMap::iterator WebRTCCommonTask::findPeerByID(
         [peer_id](std::pair<GstElement*, Peer> const& v) {
             return v.second.peer_id == peer_id;
         });
+}
+
+bool WebRTCCommonTask::hasPeerID(std::string const& peer_id) const
+{
+    return findPeerByID(peer_id) != m_peers.end();
 }
 
 void WebRTCCommonTask::waitForMessage(
@@ -391,4 +480,40 @@ void WebRTCCommonTask::waitForMessage(
     } while (base::Time::now() <= deadline);
 
     throw TimeoutError("did not receive message in time");
+}
+
+bool WebRTCCommonTask::isNegotiating(string const& peer_id) const
+{
+    auto peer_it = findPeerByID(peer_id);
+    if (peer_it == m_peers.end()) {
+        return false;
+    }
+
+    auto const& p = peer_it->second;
+    return p.peer_connection_state != GST_WEBRTC_PEER_CONNECTION_STATE_NEW ||
+           p.ice_connection_state != GST_WEBRTC_ICE_CONNECTION_STATE_CONNECTED;
+}
+
+bool WebRTCCommonTask::isPeerDisconnected(Peer const& peer) const
+{
+    constexpr std::array<GstWebRTCICEConnectionState, 3> ice_states = {
+        GST_WEBRTC_ICE_CONNECTION_STATE_DISCONNECTED,
+        GST_WEBRTC_ICE_CONNECTION_STATE_FAILED,
+        GST_WEBRTC_ICE_CONNECTION_STATE_CLOSED};
+    constexpr std::array<GstWebRTCPeerConnectionState, 3> peer_states = {
+        GST_WEBRTC_PEER_CONNECTION_STATE_DISCONNECTED,
+        GST_WEBRTC_PEER_CONNECTION_STATE_FAILED,
+        GST_WEBRTC_PEER_CONNECTION_STATE_CLOSED};
+
+    if (find(begin(ice_states), end(ice_states), peer.ice_connection_state) !=
+        ice_states.end()) {
+        return true;
+    }
+
+    if (find(begin(peer_states), end(peer_states), peer.peer_connection_state) !=
+        peer_states.end()) {
+        return true;
+    }
+
+    return false;
 }

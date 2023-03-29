@@ -86,6 +86,7 @@ task_context "WebRTCSendTask", subclasses: "WebRTCCommonTask" do
     GST_PIPELINE
 
     input_port "video_in", ro_ptr("/base/samples/frame/Frame")
+    output_port "stats", "/gstreamer/WebRTCSendStats"
 
     port_driven
 end
@@ -96,5 +97,5 @@ task_context "WebRTCReceiveTask", subclasses: "WebRTCCommonTask" do
     output_port "video_out", ro_ptr("/base/samples/frame/Frame")
     output_port "stats", "/gstreamer/WebRTCPeerStats"
 
-    port_driven
+    periodic 0.1
 end

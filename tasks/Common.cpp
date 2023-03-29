@@ -38,6 +38,10 @@ void Common::updateHook()
 {
     CommonBase::updateHook();
 
+    if (!mPipeline) {
+        return;
+    }
+
     GstState state = GST_STATE_NULL;
     gst_element_get_state(GST_ELEMENT(mPipeline), &state, nullptr, 0);
     if (state != GST_STATE_PLAYING) {

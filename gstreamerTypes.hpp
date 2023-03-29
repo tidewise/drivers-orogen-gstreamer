@@ -43,10 +43,26 @@ namespace gstreamer {
          * Leave empty if it will be known dynamically (if the component supports it)
          */
         std::string remote_peer_id;
+
+        /** How long until we abort an unsuccessful negotiation and try to connect again
+         */
+        base::Time negotiation_timeout = base::Time::fromSeconds(10);
+
+        /** How long we wait for a signalling message until we abort and try again
+         *
+         * This is different from negotiation_timeout. messaging_timeout will
+         * react quicker, but won't detect that the negotiation goes nowhere.
+         */
+        base::Time messaging_timeout = base::Time::fromMilliseconds(200);
+
+        /** How long we wait for an offer to arrive before sending an offer request again
+         */
+        base::Time offer_request_timeout = base::Time::fromMilliseconds(200);
     };
 
     struct WebRTCPeerStats {
         std::string peer_id;
+
         GstWebRTCSignalingState signaling_state = GST_WEBRTC_SIGNALING_STATE_STABLE;
         GstWebRTCPeerConnectionState peer_connection_state =
             GST_WEBRTC_PEER_CONNECTION_STATE_NEW;

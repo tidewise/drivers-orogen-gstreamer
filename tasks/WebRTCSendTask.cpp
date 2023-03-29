@@ -35,6 +35,10 @@ bool WebRTCSendTask::startHook()
         return false;
 
     startPipeline();
+
+    if (!m_signalling_config.polite && !m_signalling_config.remote_peer_id.empty()) {
+        configurePeer(m_signalling_config.remote_peer_id);
+    }
     return true;
 }
 void WebRTCSendTask::updateHook()
@@ -58,6 +62,14 @@ void WebRTCSendTask::processSignallingMessage(SignallingMessage const& message)
     if (message.type == SIGNALLING_REQUEST_OFFER) {
         if (sig_config.polite) {
             LOG_ERROR_S << "Polite peer trying to request offer, but polite is true";
+            return;
+        }
+        else if (isNegotiating(message.from)) {
+            // There is a race condition between the offer and the offer
+            // request, Letting the polite peer interrupt negotiation with a
+            // request offer would break negotiation altogether. Other mechanisms
+            // will handle this, but we let the other side send a request offer
+            // in case the connection is established and reconnection is needed
             return;
         }
 

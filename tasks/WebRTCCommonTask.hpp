@@ -36,11 +36,23 @@ namespace gstreamer {
         struct Peer : WebRTCPeerStats {
             GstElement* webrtcbin = nullptr;
             WebRTCCommonTask* task = nullptr;
+
+            base::Time negotiation_start;
+            base::Time last_signalling_message;
+            base::Time connection_start;
         };
+
+        base::Time m_last_offer_request;
 
         typedef std::map<GstElement*, Peer> PeerMap;
         PeerMap m_peers;
+        PeerMap::const_iterator findPeerByID(std::string const& peer_id) const;
         PeerMap::iterator findPeerByID(std::string const& peer_id);
+        bool hasPeerID(std::string const& peer_id) const;
+        bool isNegotiating(std::string const& peer_id) const;
+
+        void webrtcStateChange(Peer& peer);
+        bool isPeerDisconnected(Peer const& peer) const;
 
         SignallingConfig m_signalling_config;
 
@@ -88,6 +100,9 @@ namespace gstreamer {
             webrtc_base::SignallingMessage const& msg,
             GstWebRTCSDPType sdp_type);
 
+        /** Read and handle messages from signalling_in */
+        void readSignallingIn();
+
         /** Handler called by the task updateHook to process incoming signalling messages
          */
         virtual void processSignallingMessage(
@@ -96,6 +111,9 @@ namespace gstreamer {
         /** Handler called by the task updateHook to handle peer disconnection
          */
         virtual void handlePeerDisconnection(std::string const& peer_id) = 0;
+
+        void handleNegotiationTimeouts();
+        void handleOfferRequestTimeout();
 
         /** Common handling of signalling messages for the webrtcbin */
         void processSignallingMessage(GstElement* webrtcbin,

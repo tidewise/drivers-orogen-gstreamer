@@ -35,9 +35,6 @@ bool WebRTCReceiveTask::configureHook()
     if (!config.polite && !config.remote_peer_id.empty()) {
         mPipeline = createPipeline(config.remote_peer_id);
     }
-    else if (config.polite) {
-        mPipeline = createPipeline();
-    }
 
     return true;
 }
@@ -89,7 +86,11 @@ void WebRTCReceiveTask::processSignallingMessage(SignallingMessage const& messag
             return;
         }
 
-        m_peers.begin()->second.peer_id = message.from;
+        if (mPipeline) {
+            destroyPipeline();
+        }
+        mPipeline = createPipeline(message.from);
+        startPipeline();
     }
 
     auto webrtcbin = m_peers.begin()->first;
@@ -153,6 +154,8 @@ GstElement* WebRTCReceiveTask::createPipeline(string const& peer_id)
     gst_bin_add(GST_BIN(pipe.get()), webrtc);
     configureWebRTCBin(peer_id, webrtc);
     g_signal_connect(webrtc, "pad-added", G_CALLBACK(callbackIncomingStream), this);
+
+    LOG_INFO_S << "Created pipeline " << hasPeer(peer_id);
 
     return pipe.release();
 
