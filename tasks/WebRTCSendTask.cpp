@@ -150,7 +150,12 @@ void WebRTCSendTask::configurePeer(string const& peer_id)
 
     GstUnrefGuard<GstElement> splitter(
         gst_bin_get_by_name(GST_BIN(mPipeline), "splitter"));
+#if GST_CHECK_VERSION(1, 20, 0)
+    GstUnrefGuard<GstPad> srcpad(
+        gst_element_request_pad_simple(splitter.get(), "src_%u"));
+#else
     GstUnrefGuard<GstPad> srcpad(gst_element_get_request_pad(splitter.get(), "src_%u"));
+#endif
     gst_pad_link(srcpad.get(), pad);
 
     configureWebRTCBin(peer_id, webrtc);
