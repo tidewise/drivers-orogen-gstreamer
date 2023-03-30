@@ -3,10 +3,10 @@
 using_task_library "gstreamer"
 
 WEBRTC_CONNECTED_STATES = {
-    "signaling_state" => "GST_WEBRTC_SIGNALING_STATE_STABLE",
-    "peer_connection_state" => "GST_WEBRTC_PEER_CONNECTION_STATE_NEW",
-    "ice_connection_state" => "GST_WEBRTC_ICE_CONNECTION_STATE_CONNECTED",
-    "ice_gathering_state" => "GST_WEBRTC_ICE_GATHERING_STATE_COMPLETE"
+    signaling_state: :GST_WEBRTC_SIGNALING_STATE_STABLE,
+    peer_connection_state: :GST_WEBRTC_PEER_CONNECTION_STATE_CONNECTED,
+    ice_connection_state: :GST_WEBRTC_ICE_CONNECTION_STATE_COMPLETED,
+    ice_gathering_state: :GST_WEBRTC_ICE_GATHERING_STATE_COMPLETE
 }.freeze
 
 describe OroGen.gstreamer.WebRTCCommonTask do
@@ -182,9 +182,9 @@ describe OroGen.gstreamer.WebRTCCommonTask do
         end
 
         s = sender_stats_r.read
-        s1_expected = { "peer_id" => "r1" }.merge(WEBRTC_CONNECTED_STATES)
-        assert_equal [s1_expected],
-                     s.peers.sort_by(&:peer_id).map(&:to_simple_value)
+        s1_expected = { peer_id: "r1" }.merge(WEBRTC_CONNECTED_STATES)
+        assert_equal [Types.gstreamer.WebRTCPeerStats.new(s1_expected)],
+                     s.peers.sort_by(&:peer_id)
 
         expect_execution.to { have_successful_transmission(self, cmp1) }
     end
@@ -237,8 +237,7 @@ describe OroGen.gstreamer.WebRTCCommonTask do
     end
 
     def connected_peer?(p)
-        p.peer_connection_state == :GST_WEBRTC_PEER_CONNECTION_STATE_NEW &&
-            p.ice_connection_state == :GST_WEBRTC_ICE_CONNECTION_STATE_CONNECTED
+        WEBRTC_CONNECTED_STATES.all? { |key, value| value == p[key] }
     end
 
     def read_expected_frame(cmp)
