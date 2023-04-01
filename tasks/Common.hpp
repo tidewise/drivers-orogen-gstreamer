@@ -83,13 +83,13 @@ namespace gstreamer {
             FrameInputPort& port);
         void waitFirstFrames(base::Time const& deadline);
         void queueError(std::string const& message);
-        bool startPipeline();
+        virtual void startPipeline();
         virtual void destroyPipeline();
 
         static GstFlowReturn sourcePushSample(GstElement* sink, ConfiguredOutput** data);
         static GstFlowReturn sinkNewSample(GstElement* sink, ConfiguredOutput* data);
-        bool processInputs();
-        bool pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
+        void processInputs();
+        void pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
 
         class DynamicPort {
             RTT::TaskContext* m_task = nullptr;

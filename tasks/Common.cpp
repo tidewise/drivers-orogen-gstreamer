@@ -50,9 +50,7 @@ void Common::updateHook()
         return;
     }
 
-    if (!processInputs()) {
-        return;
-    }
+    processInputs();
 
     {
         RTT::os::MutexLock lock(mSync);
@@ -85,7 +83,7 @@ void Common::destroyPipeline()
     mConfiguredOutputs.clear();
 }
 
-bool Common::startPipeline()
+void Common::startPipeline()
 {
     base::Time deadline = base::Time::now() + _pipeline_initialization_timeout.get();
 
@@ -102,16 +100,12 @@ bool Common::startPipeline()
         GstClockTime timeout_ns = 50000000ULL;
         ret = gst_element_get_state(GST_ELEMENT(mPipeline), NULL, NULL, timeout_ns);
 
-        if (!processInputs()) {
-            return false;
-        }
+        processInputs();
     }
 
     if (ret == GST_STATE_CHANGE_FAILURE) {
         throw std::runtime_error("pipeline failed to start");
     }
-
-    return true;
 }
 
 void Common::configureOutput(GstElement* pipeline,
@@ -211,7 +205,7 @@ void Common::waitFirstFrames(base::Time const& deadline)
     }
 }
 
-bool Common::processInputs()
+void Common::processInputs()
 {
     for (auto& configuredInput : mConfiguredInputs) {
         while (configuredInput.port->read(configuredInput.frame, false) == RTT::NewData) {
@@ -220,21 +214,17 @@ bool Common::processInputs()
                 frame.size.width != configuredInput.width ||
                 frame.size.height != configuredInput.height) {
                 exception(INPUT_FRAME_CHANGED_PARAMETERS);
-                return false;
+                throw std::runtime_error("input frame changed parameters");
             }
 
-            if (!pushFrame(configuredInput.appsrc,
-                    configuredInput.info,
-                    *configuredInput.frame)) {
-                exception(GSTREAMER_ERROR);
-                return false;
-            }
+            pushFrame(configuredInput.appsrc,
+                configuredInput.info,
+                *configuredInput.frame);
         }
     }
-    return true;
 }
 
-bool Common::pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame)
+void Common::pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame)
 {
     /* Create a buffer to wrap the last received image */
     GstBuffer* buffer = gst_buffer_new_and_alloc(info.size);
@@ -262,7 +252,9 @@ bool Common::pushFrame(GstElement* element, GstVideoInfo& info, Frame const& fra
     GstFlowReturn ret;
     g_signal_emit_by_name(element, "push-buffer", buffer, &ret);
 
-    return ret == GST_FLOW_OK;
+    if (ret != GST_FLOW_OK) {
+        throw std::runtime_error("failed to push buffer");
+    }
 }
 
 GstFlowReturn Common::sinkNewSample(GstElement* sink, Common::ConfiguredOutput* data)
@@ -354,6 +346,10 @@ Common::DynamicPort::DynamicPort(RTT::TaskContext* task,
     : m_task(task)
     , m_port(port)
 {
+    if (task->ports()->getPort(port->getName())) {
+        throw std::runtime_error("port already in use " + port->getName());
+    }
+
     if (event) {
         task->ports()->addEventPort(port->getName(), *port);
     }
@@ -367,6 +363,9 @@ Common::DynamicPort::DynamicPort(RTT::TaskContext* task,
     : m_task(task)
     , m_port(port)
 {
+    if (task->ports()->getPort(port->getName())) {
+        throw std::runtime_error("port already in use " + port->getName());
+    }
     task->ports()->addPort(port->getName(), *port);
 }
 

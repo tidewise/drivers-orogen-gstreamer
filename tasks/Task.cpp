@@ -102,7 +102,8 @@ bool Task::startHook()
     if (!TaskBase::startHook())
         return false;
 
-    return startPipeline();
+    startPipeline();
+    return true;
 }
 
 void Task::updateHook()
