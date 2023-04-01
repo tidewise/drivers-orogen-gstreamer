@@ -58,6 +58,15 @@ namespace gstreamer {
         /** How long we wait for an offer to arrive before sending an offer request again
          */
         base::Time offer_request_timeout = base::Time::fromMilliseconds(200);
+
+        /** Bundle policy
+         *
+         * Testing shows that as of GStreamer 1.20, data channels require MAX_BUNDLE
+         * when trying to talk between a SendTask and a ReceiveTask. Not sure whether
+         * it could work in different settings, but let's stick to max bundle by default
+         * for now
+         */
+        GstWebRTCBundlePolicy bundle_policy = GST_WEBRTC_BUNDLE_POLICY_MAX_BUNDLE;
     };
 
     struct WebRTCPeerStats {
@@ -74,6 +83,30 @@ namespace gstreamer {
 
     struct WebRTCSendStats {
         std::vector<WebRTCPeerStats> peers;
+    };
+
+    /** Data channel configuration
+     *
+     * The WebRTC components will dynamically create ports of type
+     * /iodrivers_base/RawPacket to handle data channels. This configuration
+     * is used to configure which channels to expect and what do to with them
+     */
+    struct DataChannelConfig {
+        /** The label of the data channel */
+        std::string label;
+        /** The basename of the ports that will provide an interface to the channel
+         *
+         * The in port is suffixed with _in, the out port with _out.
+         *
+         * We recommend using the same value than `name`
+         */
+        std::string port_basename;
+        /** Whether the local component creates the channel or not */
+        bool create = false;
+        /** Whether data received on the input port (that should be sent through)
+         * should be sent as string or binary
+         */
+        bool binary_in = false;
     };
 }
 

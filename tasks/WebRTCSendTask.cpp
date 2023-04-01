@@ -23,8 +23,14 @@ WebRTCSendTask::~WebRTCSendTask()
 
 bool WebRTCSendTask::configureHook()
 {
-    if (!WebRTCSendTaskBase::configureHook())
+    if (!_data_channels.get().empty() && _signalling.get().remote_peer_id.empty()) {
+        LOG_ERROR_S << "Cannot configure data channels without a remote peer ID";
         return false;
+    }
+
+    if (!WebRTCSendTaskBase::configureHook()) {
+        return false;
+    }
 
     mPipeline = createPipeline();
     return true;
@@ -158,7 +164,7 @@ void WebRTCSendTask::configurePeer(string const& peer_id)
 #endif
     gst_pad_link(srcpad.get(), pad);
 
-    configureWebRTCBin(peer_id, webrtc);
+    auto& peer = configureWebRTCBin(peer_id, webrtc);
     auto& elements = m_dynamic_elements[webrtc];
     elements.tee_pad = srcpad.get();
     elements.bin = bin;
@@ -168,11 +174,9 @@ void WebRTCSendTask::configurePeer(string const& peer_id)
         throw std::runtime_error(
             "failed to create streaming elements for peer " + peer_id);
     }
+    createDataChannels(peer);
 
     LOG_INFO_S << "Configured pipeline for peer " << peer_id;
-    GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(mPipeline),
-        GST_DEBUG_GRAPH_SHOW_ALL,
-        "sender-configured");
 }
 
 void WebRTCSendTask::handlePeerDisconnection(std::string const& peer_id)

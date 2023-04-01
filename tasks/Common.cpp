@@ -385,7 +385,14 @@ Common::DynamicPort::~DynamicPort()
     delete m_port;
 }
 
-RTT::base::PortInterface* Common::DynamicPort::get()
+RTT::base::PortInterface* Common::DynamicPort::release() noexcept
+{
+    auto p = m_port;
+    m_port = nullptr;
+    return p;
+}
+
+RTT::base::PortInterface* Common::DynamicPort::get() noexcept
 {
     return m_port;
 }

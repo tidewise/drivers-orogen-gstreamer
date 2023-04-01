@@ -56,8 +56,62 @@ namespace gstreamer {
 
         SignallingConfig m_signalling_config;
 
+        typedef RTT::OutputPort<iodrivers_base::RawPacket> DataChannelOutPort;
+        typedef RTT::InputPort<iodrivers_base::RawPacket> DataChannelInPort;
+        struct DataChannel {
+            DataChannelConfig config;
+            WebRTCCommonTask* task = nullptr;
+            DynamicPort in_port;
+            DynamicPort out_port;
+            GstWebRTCDataChannel* channel = nullptr;
+
+            DataChannel(DataChannelConfig const& config,
+                WebRTCCommonTask* task,
+                DataChannelInPort* in_port,
+                DataChannelOutPort* out_port);
+            DataChannel(DataChannel const&) = delete;
+            DataChannel(DataChannel&&);
+            ~DataChannel();
+
+            DataChannelInPort* releaseIn();
+            DataChannelOutPort* releaseOut();
+            DataChannelInPort& getIn();
+            DataChannelOutPort& getOut();
+
+            void write(iodrivers_base::RawPacket const& packet);
+            RTT::FlowStatus read(iodrivers_base::RawPacket& packet);
+        };
+
+        typedef std::list<DataChannel> DataChannels;
+        DataChannels m_data_channels;
+
+        DataChannels::const_iterator findDataChannelByLabel(
+            std::string const& label) const;
+        DataChannels::iterator findDataChannelByLabel(std::string const& label);
+
+        static void callbackDataChannelNew(GstElement* webrtcbin,
+            GstWebRTCDataChannel* channel,
+            gpointer user_data);
+        static void callbackDataChannelOpen(GstWebRTCDataChannel* gstchannel,
+            gpointer user_data);
+        static void callbackDataChannelBinary(GstWebRTCDataChannel* channel,
+            GBytes* data,
+            gpointer user_data);
+        static void callbackDataChannelString(GstWebRTCDataChannel* channel,
+            gchar* data,
+            gpointer user_data);
+        static void callbackDataChannelClosed(GstWebRTCDataChannel* channel,
+            gpointer user_data);
+        void onDataChannelNew(Peer const& peer, GstWebRTCDataChannel* channel);
+        void onDataChannelOpen(DataChannel& channel, GstWebRTCDataChannel* gst);
+        void onDataChannelIn(DataChannel& channel, uint8_t const* data, size_t length);
+        void onDataChannelClosed(DataChannel& channel);
+        void sendDataChannelData();
+
         void destroyPipeline() override;
-        void configureWebRTCBin(std::string const& peer_id, GstElement* webrtcbin);
+        Peer& configureWebRTCBin(std::string const& peer_id, GstElement* webrtcbin);
+        void configureDataChannels();
+        void createDataChannels(Peer& peer);
 
         void onNegotiationNeeded(Peer& peer);
         static void callbackNegotiationNeeded(GstElement* promise, void* user_data);
@@ -94,6 +148,7 @@ namespace gstreamer {
             webrtc_base::SignallingMessage const& msg);
         void processOffer(GstElement* webrtcbin,
             webrtc_base::SignallingMessage const& msg);
+        void requestAnswer(Peer const& peer);
         void processAnswer(GstElement* webrtcbin,
             webrtc_base::SignallingMessage const& msg);
         void processRemoteDescription(GstElement* webrtcbin,

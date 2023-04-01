@@ -26,8 +26,10 @@ bool WebRTCCommonTask::configureHook()
         return false;
 
     m_signalling_config = _signalling.get();
+    configureDataChannels();
     return true;
 }
+
 bool WebRTCCommonTask::startHook()
 {
     if (!WebRTCCommonTaskBase::startHook())
@@ -47,6 +49,7 @@ void WebRTCCommonTask::updateHook()
 
     readSignallingIn();
     handleNegotiationTimeouts();
+    sendDataChannelData();
 
     auto config = m_signalling_config;
     if (config.polite && !config.remote_peer_id.empty() &&
@@ -59,7 +62,6 @@ void WebRTCCommonTask::updateHook()
 void WebRTCCommonTask::readSignallingIn()
 {
     auto config = m_signalling_config;
-    LOG_INFO_S << "Processing signalling messages";
 
     webrtc_base::SignallingMessage message;
     while (_signalling_in.read(message) == RTT::NewData) {
@@ -124,6 +126,35 @@ void WebRTCCommonTask::handleOfferRequestTimeout()
     m_last_offer_request = base::Time::now();
 }
 
+void WebRTCCommonTask::sendDataChannelData()
+{
+    iodrivers_base::RawPacket packet;
+    for (auto& channel : m_data_channels) {
+        if (!channel.channel) {
+            continue;
+        }
+
+        while (channel.read(packet) == RTT::NewData) {
+            if (channel.config.binary_in) {
+                LOG_INFO_S << "Data channel " << channel.config.label
+                           << " sending binary data";
+                GBytes* gbytes = g_bytes_new(packet.data.data(), packet.data.size());
+                g_signal_emit_by_name(channel.channel, "send-data", gbytes, nullptr);
+            }
+            else {
+                LOG_INFO_S << "Data channel " << channel.config.label
+                           << " sending string data";
+                char const* bytes_as_char = reinterpret_cast<char*>(packet.data.data());
+                string str(bytes_as_char, bytes_as_char + packet.data.size());
+                g_signal_emit_by_name(channel.channel,
+                    "send-string",
+                    str.c_str(),
+                    nullptr);
+            }
+        }
+    }
+}
+
 void WebRTCCommonTask::handleNegotiationTimeouts()
 {
     vector<string> timed_out_peers;
@@ -183,6 +214,7 @@ void WebRTCCommonTask::stopHook()
 }
 void WebRTCCommonTask::cleanupHook()
 {
+    m_data_channels.clear();
     WebRTCCommonTaskBase::cleanupHook();
 }
 
@@ -201,7 +233,8 @@ void WebRTCCommonTask::onNegotiationNeeded(Peer& peer)
         g_signal_emit_by_name(G_OBJECT(peer.webrtcbin), "create-offer", NULL, promise);
     }
     else {
-        LOG_INFO_S << "Expecting offer from " << peer.peer_id;
+        LOG_INFO_S << "Expecting offer from " << peer.peer_id << " signaling state is "
+                   << peer.signaling_state;
     }
 }
 void WebRTCCommonTask::callbackAnswerCreated(GstPromise* promise, gpointer user_data)
@@ -288,6 +321,11 @@ void WebRTCCommonTask::processOffer(GstElement* webrtcbin, SignallingMessage con
     processRemoteDescription(webrtcbin, msg, GST_WEBRTC_SDP_TYPE_OFFER);
 
     auto& peer = m_peers.at(webrtcbin);
+    requestAnswer(peer);
+}
+
+void WebRTCCommonTask::requestAnswer(Peer const& peer)
+{
     GstPromise* promise =
         gst_promise_new_with_change_func(callbackAnswerCreated, (gpointer)&peer, NULL);
     LOG_INFO_S << "Requesting answer from webrtcbin";
@@ -398,7 +436,110 @@ void WebRTCCommonTask::callbackICEGatheringStateChange(GstElement* webrtcbin,
     peer.task->updatePeersStats();
 }
 
-void WebRTCCommonTask::configureWebRTCBin(string const& peer_id, GstElement* webrtcbin)
+void WebRTCCommonTask::callbackDataChannelNew(GstElement* webrtcbin,
+    GstWebRTCDataChannel* channel,
+    gpointer user_data)
+{
+    auto& peer(*reinterpret_cast<WebRTCCommonTask::Peer*>(user_data));
+    peer.task->onDataChannelNew(peer, channel);
+}
+
+void WebRTCCommonTask::onDataChannelNew(Peer const& peer,
+    GstWebRTCDataChannel* gstchannel)
+{
+    char* label_c = nullptr;
+    g_object_get(gstchannel, "label", &label_c, nullptr);
+    string label(label_c);
+    g_free(label_c);
+
+    auto channel_it = findDataChannelByLabel(label);
+    if (channel_it == m_data_channels.end()) {
+        LOG_INFO_S << "Ignoring channel with label '" << label << "'";
+        return;
+    }
+    auto& channel = *channel_it;
+
+    LOG_INFO_S << "Data channel: new " << label;
+
+    g_signal_connect(gstchannel,
+        "on-open",
+        G_CALLBACK(callbackDataChannelOpen),
+        (gpointer)&channel);
+    g_signal_connect(gstchannel,
+        "on-message-data",
+        G_CALLBACK(callbackDataChannelBinary),
+        (gpointer)&channel);
+    g_signal_connect(gstchannel,
+        "on-message-string",
+        G_CALLBACK(callbackDataChannelString),
+        (gpointer)&channel);
+    g_signal_connect(gstchannel,
+        "on-close",
+        G_CALLBACK(callbackDataChannelClosed),
+        (gpointer)&channel);
+}
+
+void WebRTCCommonTask::callbackDataChannelOpen(GstWebRTCDataChannel* gstchannel,
+    gpointer user_data)
+{
+    DataChannel& channel = *reinterpret_cast<DataChannel*>(user_data);
+    channel.task->onDataChannelOpen(channel, gstchannel);
+}
+
+void WebRTCCommonTask::onDataChannelOpen(DataChannel& channel, GstWebRTCDataChannel* gst)
+{
+    LOG_INFO_S << "Data channel " << channel.config.label << " opened";
+    channel.channel = gst;
+}
+
+void WebRTCCommonTask::callbackDataChannelBinary(GstWebRTCDataChannel* gstchannel,
+    GBytes* data,
+    gpointer user_data)
+{
+    gsize size = 0;
+    uint8_t const* bytes = static_cast<uint8_t const*>(g_bytes_get_data(data, &size));
+    if (!data) {
+        return;
+    }
+
+    DataChannel& channel = *reinterpret_cast<DataChannel*>(user_data);
+    channel.task->onDataChannelIn(channel, bytes, size);
+}
+
+void WebRTCCommonTask::callbackDataChannelString(GstWebRTCDataChannel* gstchannel,
+    gchar* data,
+    gpointer user_data)
+{
+    DataChannel& channel = *reinterpret_cast<DataChannel*>(user_data);
+    channel.task->onDataChannelIn(channel,
+        reinterpret_cast<uint8_t const*>(data),
+        strlen(data));
+}
+void WebRTCCommonTask::onDataChannelIn(DataChannel& channel,
+    uint8_t const* data,
+    size_t size)
+{
+    LOG_INFO_S << "Data channel " << channel.config.label << " received data";
+    iodrivers_base::RawPacket packet;
+    packet.time = base::Time::now();
+    packet.data.insert(packet.data.end(), data, data + size);
+    channel.write(packet);
+}
+
+void WebRTCCommonTask::callbackDataChannelClosed(GstWebRTCDataChannel* gstchannel,
+    gpointer user_data)
+{
+    DataChannel& channel = *reinterpret_cast<DataChannel*>(user_data);
+    channel.task->onDataChannelClosed(channel);
+}
+void WebRTCCommonTask::onDataChannelClosed(DataChannel& channel)
+{
+    LOG_INFO_S << "Data channel " << channel.config.label << " closed";
+    channel.channel = nullptr;
+}
+
+WebRTCCommonTask::Peer& WebRTCCommonTask::configureWebRTCBin(string const& peer_id,
+    GstElement* webrtcbin)
 {
     auto& peer = m_peers[webrtcbin];
     peer.peer_id = peer_id;
@@ -406,6 +547,8 @@ void WebRTCCommonTask::configureWebRTCBin(string const& peer_id, GstElement* web
     peer.webrtcbin = webrtcbin;
     peer.negotiation_start = base::Time::now();
     peer.last_signalling_message = base::Time::now();
+
+    g_object_set(webrtcbin, "bundle-policy", m_signalling_config.bundle_policy, nullptr);
 
     g_signal_connect(webrtcbin,
         "notify::signaling-state",
@@ -431,6 +574,30 @@ void WebRTCCommonTask::configureWebRTCBin(string const& peer_id, GstElement* web
         "on-negotiation-needed",
         G_CALLBACK(callbackNegotiationNeeded),
         (gpointer)&peer);
+    g_signal_connect(webrtcbin,
+        "on-data-channel",
+        G_CALLBACK(callbackDataChannelNew),
+        (gpointer)&peer);
+
+    return peer;
+}
+
+void WebRTCCommonTask::createDataChannels(Peer& peer)
+{
+    LOG_INFO_S << "Creating data channels";
+    for (auto const& c : m_data_channels) {
+        if (!c.config.create) {
+            continue;
+        }
+
+        GstWebRTCDataChannel* channel = nullptr;
+        g_signal_emit_by_name(peer.webrtcbin,
+            "create-data-channel",
+            c.config.label.c_str(),
+            nullptr,
+            &channel);
+        onDataChannelNew(peer, channel);
+    }
 }
 
 void WebRTCCommonTask::destroyPipeline()
@@ -516,4 +683,91 @@ bool WebRTCCommonTask::isPeerDisconnected(Peer const& peer) const
     }
 
     return false;
+}
+
+void WebRTCCommonTask::configureDataChannels()
+{
+    std::list<DataChannel> channels;
+    for (auto const& c : _data_channels.get()) {
+        string out_port_name = c.port_basename + "_out";
+        string in_port_name = c.port_basename + "_in";
+        if (provides()->hasService(out_port_name) ||
+            provides()->hasService(in_port_name)) {
+            throw std::runtime_error("setting up ports for channel " + c.label +
+                                     " would collide with existing ports");
+        }
+
+        DataChannelInPort* in_p = new DataChannelInPort(in_port_name);
+        DataChannelOutPort* out_p = new DataChannelOutPort(out_port_name);
+
+        DataChannel channel(c, this, in_p, out_p);
+        channels.emplace_back(move(channel));
+    }
+
+    m_data_channels = move(channels);
+}
+
+WebRTCCommonTask::DataChannels::const_iterator WebRTCCommonTask::findDataChannelByLabel(
+    std::string const& label) const
+{
+    return const_cast<WebRTCCommonTask*>(this)->findDataChannelByLabel(label);
+}
+WebRTCCommonTask::DataChannels::iterator WebRTCCommonTask::findDataChannelByLabel(
+    std::string const& label)
+{
+    return find_if(begin(m_data_channels),
+        end(m_data_channels),
+        [label](DataChannel const& c) { return c.config.label == label; });
+}
+
+WebRTCCommonTask::DataChannel::DataChannel(DataChannelConfig const& config,
+    WebRTCCommonTask* task,
+    WebRTCCommonTask::DataChannelInPort* in_port,
+    WebRTCCommonTask::DataChannelOutPort* out_port)
+    : config(config)
+    , task(task)
+    , in_port(task, in_port, true)
+    , out_port(task, out_port)
+{
+}
+
+WebRTCCommonTask::DataChannel::~DataChannel()
+{
+}
+
+WebRTCCommonTask::DataChannel::DataChannel(DataChannel&& src)
+    : config(src.config)
+    , task(src.task)
+    , in_port(move(src.in_port))
+    , out_port(move(src.out_port))
+{
+}
+
+WebRTCCommonTask::DataChannelInPort* WebRTCCommonTask::DataChannel::releaseIn()
+{
+    return static_cast<DataChannelInPort*>(in_port.release());
+}
+
+WebRTCCommonTask::DataChannelInPort& WebRTCCommonTask::DataChannel::getIn()
+{
+    return *static_cast<DataChannelInPort*>(in_port.get());
+}
+
+WebRTCCommonTask::DataChannelOutPort& WebRTCCommonTask::DataChannel::getOut()
+{
+    return *static_cast<DataChannelOutPort*>(out_port.get());
+}
+
+WebRTCCommonTask::DataChannelOutPort* WebRTCCommonTask::DataChannel::releaseOut()
+{
+    return static_cast<DataChannelOutPort*>(out_port.release());
+}
+
+void WebRTCCommonTask::DataChannel::write(iodrivers_base::RawPacket const& packet)
+{
+    return getOut().write(packet);
+}
+RTT::FlowStatus WebRTCCommonTask::DataChannel::read(iodrivers_base::RawPacket& packet)
+{
+    return getIn().read(packet);
 }

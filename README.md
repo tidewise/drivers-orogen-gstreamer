@@ -1,5 +1,7 @@
 # gstreamer::Task, a generic GStreamer processing step for Rock
 
+WARNING: this package requires GStreamer 1.20 or later
+
 This package implements a single component, gstreamer::Task that allows to either
 inject or retrieve images from a string-defined GStreamer pipeline.
 

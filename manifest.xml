@@ -7,6 +7,7 @@
   <depend package="base/orogen/types" />
   <depend package="gstreamer" />
   <depend package="drivers/orogen/webrtc_base" />
+  <depend package="drivers/orogen/iodrivers_base" />
 
   <test_depend package="tools/syskit" />
 </package>

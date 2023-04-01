@@ -11,6 +11,7 @@ import_types_from "gstreamerTypes.hpp"
 import_types_from "std"
 import_types_from "base"
 import_types_from "webrtc_base"
+import_types_from "iodrivers_base"
 
 OroGen::Spec::Deployment.register_global_initializer(:gstreamer)
 if defined?(OroGen::Gen::RTT_CPP::Deployment)
@@ -80,6 +81,16 @@ task_context "WebRTCCommonTask", subclasses: "Common" do
     # WebRTC signalling messages sent by the component
     output_port "signalling_out", "/webrtc_base/SignallingMessage"
 
+    # Configuration of expected data channels
+    #
+    # This configures both data channels that we expect from our peer, and
+    # channels that we should be creating
+    property "data_channels", "/std/vector</gstreamer/DataChannelConfig>"
+
+    # Dynamic output port created for data channels
+    dynamic_input_port(/\w+_in/, "/iodrivers_base/RawPacket")
+    dynamic_output_port(/\w+_out/, "/iodrivers_base/RawPacket")
+
     port_driven
 end
 
@@ -89,6 +100,9 @@ end
 # supports having multiple receivers.
 #
 # The video stream must be available on start, even if there are no peers.
+#
+# Data channels are only supported for a single peer. Configuration will fail
+# if data channels are created with remote_peer_id set to an empty value.
 task_context "WebRTCSendTask", subclasses: "WebRTCCommonTask" do
     # GStreamer pipeline definition that encodes the video_in stream to a RTP
     # stream that webrtc can ingest directly

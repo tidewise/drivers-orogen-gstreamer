@@ -104,7 +104,8 @@ namespace gstreamer {
             DynamicPort(DynamicPort&&);
             ~DynamicPort();
 
-            RTT::base::PortInterface* get();
+            RTT::base::PortInterface* get() noexcept;
+            RTT::base::PortInterface* release() noexcept;
         };
         std::vector<DynamicPort> m_dynamic_ports;
 

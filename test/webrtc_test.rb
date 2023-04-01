@@ -156,6 +156,56 @@ describe OroGen.gstreamer.WebRTCCommonTask do
         end
     end
 
+    describe "data channels" do
+        it "creates a connection on an impolite sender" do
+            cmp_m = self.cmp_m(
+                sender_polite: false,
+                sender_remote_peer_id: "receiver",
+                receiver_remote_peer_id: "sender",
+                data_channels: [{ label: "c", from_sender: true }]
+            )
+            cmp = syskit_deploy_configure_and_start(cmp_m)
+
+            sender_msg = Types.iodrivers_base.RawPacket.new(data: [1])
+            receiver_msg = Types.iodrivers_base.RawPacket.new(data: [2])
+            sender_out_msg, receiver_out_msg =
+                expect_execution.poll do
+                    syskit_write cmp.send_child.send_child.c_in_port, sender_msg
+                    syskit_write cmp.receive_child.c_in_port, receiver_msg
+                end.to do
+                    [have_one_new_sample(cmp.send_child.send_child.c_out_port),
+                     have_one_new_sample(cmp.receive_child.c_out_port)]
+                end
+
+            assert_equal sender_msg.data, receiver_out_msg.data
+            assert_equal receiver_msg.data, sender_out_msg.data
+        end
+
+        it "creates a connection on a polite receiver" do
+            cmp_m = self.cmp_m(
+                sender_polite: false,
+                sender_remote_peer_id: "receiver",
+                receiver_remote_peer_id: "sender",
+                data_channels: [{ label: "c", from_sender: false }]
+            )
+            cmp = syskit_deploy_configure_and_start(cmp_m)
+
+            sender_msg = Types.iodrivers_base.RawPacket.new(data: [1])
+            receiver_msg = Types.iodrivers_base.RawPacket.new(data: [2])
+            sender_out_msg, receiver_out_msg =
+                expect_execution.poll do
+                    syskit_write cmp.send_child.send_child.c_in_port, sender_msg
+                    syskit_write cmp.receive_child.c_in_port, receiver_msg
+                end.to do
+                    [have_one_new_sample(cmp.send_child.send_child.c_out_port),
+                     have_one_new_sample(cmp.receive_child.c_out_port)]
+                end
+
+            assert_equal sender_msg.data, receiver_out_msg.data
+            assert_equal receiver_msg.data, sender_out_msg.data
+        end
+    end
+
     it "dynamically detects a lost peer on the send side" do
         cmp1_m = cmp_m(
             receiver: "r1", sender_polite: false, receiver_remote_peer_id: "sender"
@@ -189,36 +239,58 @@ describe OroGen.gstreamer.WebRTCCommonTask do
         expect_execution.to { have_successful_transmission(self, cmp1) }
     end
 
-    def sender_m(self_peer_id: "sender", remote_peer_id: nil, polite:)
+    def sender_m(self_peer_id: "sender", remote_peer_id: nil, polite:, data_channels: [])
+        data_channels = data_channels.map do |h|
+            { label: h[:label], port_basename: h[:label],
+              create: h[:from_sender], binary_in: h[:binary_in] || false }
+        end
+
+        send_m =
+            data_channels.inject(OroGen.gstreamer.WebRTCSendTask) do |task_m, c|
+                task_m.with_dynamic_service("data_channel", as: c[:label])
+            end
+
         @sender_m.use(
             "send" =>
-                OroGen.gstreamer.WebRTCSendTask
+                send_m
                       .deployed_as("gstreamer_webrtc_test_#{self_peer_id}")
                       .with_arguments(
                           self_peer_id: self_peer_id, remote_peer_id: remote_peer_id,
-                          polite: polite
+                          polite: polite, data_channels: data_channels
                       )
         )
     end
 
-    def receiver_m(self_peer_id: "receiver", remote_peer_id: nil, polite:)
-        OroGen.gstreamer.WebRTCReceiveTask
-              .deployed_as("gstreamer_webrtc_test_#{self_peer_id}")
-              .with_arguments(
-                  self_peer_id: self_peer_id, remote_peer_id: remote_peer_id,
-                  polite: polite
-              )
+    def receiver_m(self_peer_id: "receiver", remote_peer_id: nil, polite:, data_channels: [])
+        data_channels = data_channels.map do |h|
+            { label: h[:label], port_basename: h[:label],
+              create: !h[:from_sender], binary_in: h[:binary_in] || false }
+        end
+
+        receive_m =
+            data_channels.inject(OroGen.gstreamer.WebRTCReceiveTask) do |task_m, c|
+                task_m.with_dynamic_service("data_channel", as: c[:label])
+            end
+
+        receive_m
+            .deployed_as("gstreamer_webrtc_test_#{self_peer_id}")
+            .with_arguments(
+                self_peer_id: self_peer_id, remote_peer_id: remote_peer_id,
+                polite: polite, data_channels: data_channels
+            )
     end
 
-    def cmp_m(sender: "sender", receiver: "receiver", sender_remote_peer_id: nil,
-        receiver_remote_peer_id: nil, sender_polite:)
+    def cmp_m(
+        sender: "sender", receiver: "receiver", sender_remote_peer_id: nil,
+        receiver_remote_peer_id: nil, sender_polite:, data_channels: []
+    )
         sender_m = self.sender_m(
             self_peer_id: sender, remote_peer_id: sender_remote_peer_id,
-            polite: sender_polite
+            polite: sender_polite, data_channels: data_channels
         )
         receiver_m = self.receiver_m(
             self_peer_id: receiver, remote_peer_id: receiver_remote_peer_id,
-            polite: !sender_polite
+            polite: !sender_polite, data_channels: data_channels
         )
         @cmp_m.use("send" => sender_m, "receive" => receiver_m)
     end
@@ -276,12 +348,23 @@ module Services
     data_service_type "ImageSink" do
         input_port "image", ro_ptr("/base/samples/frame/Frame")
     end
+
+    data_service_type "DataChannel" do
+        input_port "in", "/iodrivers_base/RawPacket"
+        output_port "out", "/iodrivers_base/RawPacket"
+    end
 end
 
 Syskit.extend_model OroGen.gstreamer.WebRTCCommonTask do
     argument :self_peer_id
     argument :remote_peer_id, default: nil
     argument :polite
+    argument :data_channels, default: []
+
+    dynamic_service Services::DataChannel, as: "data_channel" do
+        provides Services::DataChannel,
+                 as: name, "out" => "#{name}_out", "in" => "#{name}_in"
+    end
 
     def update_properties
         super
@@ -292,6 +375,7 @@ Syskit.extend_model OroGen.gstreamer.WebRTCCommonTask do
             s.polite = polite
             s
         end
+        properties.data_channels = data_channels
     end
 end
 
@@ -299,6 +383,7 @@ Syskit.extend_model OroGen.gstreamer.Task do
     argument :pipeline
     argument :inputs, default: []
     argument :outputs, default: []
+    argument :channels, default: []
 
     dynamic_service Services::ImageSink, as: "image_sink" do
         provides Services::ImageSink, as: name, "image" => name
