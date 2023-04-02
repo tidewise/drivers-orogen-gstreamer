@@ -1,19 +1,15 @@
 # frozen_string_literal: true
 
-using_task_library "gstreamer"
+require_relative "models"
 
-task_m = OroGen.gstreamer.Task
 describe OroGen.gstreamer.Task do
     run_live
 
     it "attaches ports to source and sinks in the pipeline" do
         self.expect_execution_default_timeout = 600
 
-        source_m = task_m.specialize
-        source_m.require_dynamic_service("image_source", as: "out")
-
-        sink_m = task_m.specialize
-        sink_m.require_dynamic_service("image_sink", as: "in")
+        source_m = OroGen.gstreamer.Task.with_dynamic_service("image_source", as: "out")
+        sink_m = OroGen.gstreamer.Task.with_dynamic_service("image_sink", as: "in")
 
         cmp_m = Syskit::Composition.new_submodel
         cmp_m
@@ -25,7 +21,7 @@ describe OroGen.gstreamer.Task do
                         appsink name=out
                 PIPELINE
             )
-            .prefer_deployed_tasks(/generator/)
+            .deployed_as("generator")
         cmp_m
             .add(sink_m, as: "inverter")
             .with_arguments(
@@ -35,7 +31,7 @@ describe OroGen.gstreamer.Task do
                         rtpvrawpay ! udpsink host=127.0.0.1 port=9384
                 PIPELINE
             )
-            .prefer_deployed_tasks(/inverter/)
+            .deployed_as("inverter")
         cmp_m
             .add(source_m, as: "target")
             .with_arguments(
@@ -47,7 +43,7 @@ describe OroGen.gstreamer.Task do
                         videoflip method=vertical-flip ! appsink name=out
                 PIPELINE
             )
-            .prefer_deployed_tasks(/target/)
+            .deployed_as("target")
 
         cmp_m.generator_child.connect_to cmp_m.inverter_child
         cmp = syskit_deploy_configure_and_start(cmp_m)
@@ -73,11 +69,8 @@ describe OroGen.gstreamer.Task do
         # This requires special handling inside the component
         self.expect_execution_default_timeout = 600
 
-        source_m = task_m.specialize
-        source_m.require_dynamic_service("image_source", as: "out")
-
-        sink_m = task_m.specialize
-        sink_m.require_dynamic_service("image_sink", as: "in")
+        source_m = OroGen.gstreamer.Task.with_dynamic_service("image_source", as: "out")
+        sink_m = OroGen.gstreamer.Task.with_dynamic_service("image_sink", as: "in")
 
         cmp_m = Syskit::Composition.new_submodel
         cmp_m
@@ -89,7 +82,7 @@ describe OroGen.gstreamer.Task do
                         appsink name=out
                 PIPELINE
             )
-            .prefer_deployed_tasks(/generator/)
+            .deployed_as("generator")
         cmp_m
             .add(sink_m, as: "inverter")
             .with_arguments(
@@ -99,7 +92,7 @@ describe OroGen.gstreamer.Task do
                         rtpvrawpay ! udpsink host=127.0.0.1 port=9384
                 PIPELINE
             )
-            .prefer_deployed_tasks(/inverter/)
+            .deployed_as("inverter")
         cmp_m
             .add(source_m, as: "target")
             .with_arguments(
@@ -111,7 +104,7 @@ describe OroGen.gstreamer.Task do
                         videoflip method=vertical-flip ! appsink name=out
                 PIPELINE
             )
-            .prefer_deployed_tasks(/target/)
+            .deployed_as("target")
 
         cmp_m.generator_child.connect_to cmp_m.inverter_child
         cmp = syskit_deploy_configure_and_start(cmp_m)
@@ -137,40 +130,3 @@ describe OroGen.gstreamer.Task do
         end
     end
 end
-
-module Services
-    data_service_type "ImageSource" do
-        output_port "image", ro_ptr("/base/samples/frame/Frame")
-    end
-
-    data_service_type "ImageSink" do
-        input_port "image", ro_ptr("/base/samples/frame/Frame")
-    end
-end
-
-task_m.class_eval do
-    argument :pipeline
-    argument :inputs, default: []
-    argument :outputs, default: []
-
-    dynamic_service Services::ImageSink, as: "image_sink" do
-        provides Services::ImageSink, as: name, "image" => name
-    end
-
-    dynamic_service Services::ImageSource, as: "image_source" do
-        provides Services::ImageSource, as: name, "image" => name
-    end
-
-    def update_properties
-        super
-
-        properties.pipeline_initialization_timeout = Time.at(600)
-        properties.pipeline = pipeline
-        properties.inputs = inputs
-        properties.outputs = outputs
-    end
-end
-
-Syskit.conf.use_deployment OroGen.gstreamer.Task => "generator"
-Syskit.conf.use_deployment OroGen.gstreamer.Task => "inverter"
-Syskit.conf.use_deployment OroGen.gstreamer.Task => "target"
