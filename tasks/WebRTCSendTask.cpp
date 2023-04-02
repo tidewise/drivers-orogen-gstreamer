@@ -118,9 +118,8 @@ void WebRTCSendTask::stopHook()
 
 void WebRTCSendTask::cleanupHook()
 {
-    WebRTCSendTaskBase::cleanupHook();
-
     destroyPipeline();
+    WebRTCSendTaskBase::cleanupHook();
 }
 
 GstElement* WebRTCSendTask::createPipeline()
