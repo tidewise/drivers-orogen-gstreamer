@@ -10,9 +10,10 @@ describe OroGen.gstreamer.Task do
 
         cmp = syskit_deploy_configure_and_start(cmp_m)
         samples = expect_execution.to do
-            [have_one_new_sample(cmp.generator_child.out_port),
-             have_one_new_sample(cmp.target_child.out_port)]
+            [have_new_samples(cmp.generator_child.out_port, 2),
+             have_new_samples(cmp.target_child.out_port, 2)]
         end
+        samples = samples.map(&:last)
 
         expected = File.binread(File.join(__dir__, "videotestsrc_colors_320_240.bin"))
         assert_frame_ok(samples[0], expected, 320, 240, 960, "generated frame")
@@ -24,9 +25,10 @@ describe OroGen.gstreamer.Task do
         # This requires special handling inside the component
         cmp = syskit_deploy_configure_and_start(cmp_m(319, 240))
         samples = expect_execution.to do
-            [have_one_new_sample(cmp.generator_child.out_port),
-             have_one_new_sample(cmp.target_child.out_port)]
+            [have_new_samples(cmp.generator_child.out_port, 2),
+             have_new_samples(cmp.target_child.out_port, 2)]
         end
+        samples = samples.map(&:last)
 
         expected = File.binread(File.join(__dir__, "videotestsrc_colors_319_240.bin"))
         assert_frame_ok(samples[0], expected, 319, 240, 957, "generated frame")
