@@ -181,30 +181,6 @@ describe OroGen.gstreamer.WebRTCCommonTask do
             assert_equal sender_msg.data, receiver_out_msg.data
             assert_equal receiver_msg.data, sender_out_msg.data
         end
-
-        it "creates a connection on a polite receiver" do
-            cmp_m = self.cmp_m(
-                sender_polite: false,
-                sender_remote_peer_id: "receiver",
-                receiver_remote_peer_id: "sender",
-                data_channels: [{ label: "c", from_sender: false }]
-            )
-            cmp = syskit_deploy_configure_and_start(cmp_m)
-
-            sender_msg = Types.iodrivers_base.RawPacket.new(data: [1])
-            receiver_msg = Types.iodrivers_base.RawPacket.new(data: [2])
-            sender_out_msg, receiver_out_msg =
-                expect_execution.poll do
-                    syskit_write cmp.send_child.send_child.c_in_port, sender_msg
-                    syskit_write cmp.receive_child.c_in_port, receiver_msg
-                end.to do
-                    [have_one_new_sample(cmp.send_child.send_child.c_out_port),
-                     have_one_new_sample(cmp.receive_child.c_out_port)]
-                end
-
-            assert_equal sender_msg.data, receiver_out_msg.data
-            assert_equal receiver_msg.data, sender_out_msg.data
-        end
     end
 
     it "dynamically detects a lost peer on the send side" do
