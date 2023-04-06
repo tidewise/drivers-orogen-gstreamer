@@ -52,9 +52,10 @@ describe OroGen.gstreamer.Task do
         cmp_m.generator_child.connect_to cmp_m.inverter_child
         cmp = syskit_deploy_configure_and_start(cmp_m)
         samples = expect_execution.to do
-            [have_one_new_sample(cmp.generator_child.out_port),
-             have_one_new_sample(cmp.target_child.out_port)]
+            [have_new_samples(cmp.generator_child.out_port, 2),
+             have_new_samples(cmp.target_child.out_port, 2)]
         end
+        samples = samples.map(&:last)
 
         expected = File.binread(File.join(__dir__, "videotestsrc_colors_320_240.bin"))
         2.times do |i|
@@ -116,9 +117,10 @@ describe OroGen.gstreamer.Task do
         cmp_m.generator_child.connect_to cmp_m.inverter_child
         cmp = syskit_deploy_configure_and_start(cmp_m)
         samples = expect_execution.to do
-            [have_one_new_sample(cmp.generator_child.out_port),
-             have_one_new_sample(cmp.target_child.out_port)]
+            [have_new_samples(cmp.generator_child.out_port, 2),
+             have_new_samples(cmp.target_child.out_port, 2)]
         end
+        samples = samples.map(&:last)
 
         expected = File.binread(File.join(__dir__, "videotestsrc_colors_319_240.bin"))
         2.times do |i|
