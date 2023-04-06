@@ -5,10 +5,12 @@
 
 #include "Task.hpp"
 #include "Helpers.hpp"
+#include "aggregator/TimestampEstimator.hpp"
 
 using namespace std;
 using namespace gstreamer;
 using namespace base::samples::frame;
+
 
 Task::Task(std::string const& name)
     : TaskBase(name)
@@ -19,6 +21,11 @@ Task::Task(std::string const& name)
 Task::~Task()
 {
 }
+
+
+
+
+
 
 /// The following lines are template definitions for the various state machine
 // hooks defined by Orocos::RTT. See Task.hpp for more detailed
@@ -124,14 +131,28 @@ void Task::configureOutputs(GstElement* pipeline) {
         );
 
         FrameOutputPort* port = new FrameOutputPort(outputConfig.name);
-        ports()->addPort(outputConfig.name, *port);
-        mConfiguredOutputs.emplace_back(
-            std::move(ConfiguredOutput(*this, port, outputConfig.frame_mode))
-        );
 
-        port->setDataSample(mConfiguredOutputs.back().frame);
+        auto timestamperStatuPortName = outputConfig.name + "_timestamper_status";
+        auto timestamperStatusPort = new TimestamperStatusPort(timestamperStatuPortName);
+
+        ConfiguredOutput configuredOutput(*this, timestamperStatusPort, port, outputConfig.frame_mode);
+        port->setDataSample(configuredOutput.frame);
+        ports()->addPort(outputConfig.name, *port);
+        ports()->addPort(timestamperStatuPortName, *timestamperStatusPort);
+        configuredOutput.mTimestamperActivated = !outputConfig.period.isNull();
+        mConfiguredOutputs.emplace_back(std::move(configuredOutput));
+
+        if (configuredOutput.mTimestamperActivated) {
+            mConfiguredOutputs.back().mTimestamper = aggregator::TimestampEstimator(
+                outputConfig.window,
+                outputConfig.period,
+                outputConfig.sample_loss_threshold
+            );
+        }
+
         g_signal_connect(
             appsink,
+             // !!! HERE: last argument must have the lifetime of the task
             "new-sample", G_CALLBACK(sinkNewSample), &mConfiguredOutputs.back()
         );
     }
@@ -168,6 +189,13 @@ bool Task::startHook()
     if (ret == GST_STATE_CHANGE_FAILURE) {
         throw std::runtime_error("pipeline failed to start");
     }
+    // Resetting the timestamper estimator.
+    for (auto& configuredOutput : mConfiguredOutputs) {
+        if (configuredOutput.mTimestamperActivated) {
+            configuredOutput.mTimestamper.reset();
+        }
+    }
+
     return true;
 }
 
@@ -177,6 +205,8 @@ void Task::queueError(std::string const& message) {
 }
 void Task::updateHook()
 {
+    TaskBase::updateHook();
+
     if (!processInputs()) {
         return;
     }
@@ -187,8 +217,6 @@ void Task::updateHook()
             throw std::runtime_error(mErrorQueue.front());
         }
     }
-
-    TaskBase::updateHook();
 }
 
 void Task::errorHook()
@@ -334,8 +362,18 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
     std::unique_ptr<Frame> frame(data->frame.write_access());
     frame->init(width, height, 8, data->frameMode);
 
-    frame->time = base::Time::now();
+    auto now = base::Time::now();
+    frame->received_time = now;
+    if (data->mTimestamperActivated) {
+        frame->time = data->mTimestamper.update(now);
+    } else {
+        frame->time = now;
+    }
+
+
     frame->frame_status = STATUS_VALID;
+
+
 
     uint8_t* pixels = &(frame->image[0]);
     if (frame->getNumberOfBytes() > mapInfo.size) {
@@ -361,6 +399,11 @@ GstFlowReturn Task::sinkNewSample(GstElement *sink, Task::ConfiguredOutput *data
     }
     data->frame.reset(frame.release());
     data->port->write(data->frame);
+
+    if (data->mTimestamperActivated) {
+        data->mTimestamperStatusPort->write(data->mTimestamper.getStatus());
+    }
+
     return GST_FLOW_OK;
 }
 
@@ -400,4 +443,25 @@ Task::ConfiguredInput::ConfiguredInput(
 )
     : ConfiguredPort<Task::FrameInputPort>(task, port)
     , appsrc(appsrc) {
+}
+
+
+Task::ConfiguredOutput::ConfiguredOutput(
+    Task& task, Task::TimestamperStatusPort* statusPort, Task::FrameOutputPort* port, FrameMode frameMode
+)
+    : ConfiguredPort<Task::FrameOutputPort>(task, port, frameMode)
+    , mTimestamperStatusPort(statusPort) {
+}
+Task::ConfiguredOutput::ConfiguredOutput(ConfiguredOutput&& src)
+    : ConfiguredPort<Task::FrameOutputPort>(std::move(src))
+    , mTimestamper(src.mTimestamper)
+    , mTimestamperStatusPort(src.mTimestamperStatusPort)
+    , mTimestamperActivated(src.mTimestamperActivated) {
+    src.mTimestamperStatusPort = nullptr;
+}
+Task::ConfiguredOutput::~ConfiguredOutput() {
+    if (mTimestamperStatusPort) {
+        task.ports()->removePort(mTimestamperStatusPort->getName());
+        delete mTimestamperStatusPort;
+    }
 }
