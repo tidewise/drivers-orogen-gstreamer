@@ -6,9 +6,14 @@
   <depend package="base/cmake" />
   <depend package="base/orogen/types" />
   <depend package="gstreamer" />
+  <depend package="gstreamer-webrtc-dev" />
+  <depend package="gstreamer-app-dev" />
   <depend package="drivers/orogen/webrtc_base" />
   <depend package="drivers/orogen/iodrivers_base" />
 
   <test_depend package="tools/syskit" />
   <test_depend package="gstreamer-x264" />
+  <test_depend package="gstreamer-videotestsrc" />
+  <test_depend package="gstreamer-rtph264" />
+  <test_depend package="gstreamer-libav" />
 </package>
