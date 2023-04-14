@@ -10,6 +10,10 @@ if (ROCK_TEST_ENABLED)
     enable_testing()
     find_package(Syskit REQUIRED)
     syskit_orogen_tests(test)
+
+    set_tests_properties(test PROPERTIES
+        ENVIRONMENT "ROBY_BASE_LOG_DIR=${ROCK_TEST_LOG_DIR};GST_DEBUG=3,webrtcbin:7;G_DEBUG=fatal_warnings"
+    )
 endif()
 
 # FIND_PACKAGE(KDL)
