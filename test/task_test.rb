@@ -35,12 +35,28 @@ describe OroGen.gstreamer.Task do
         assert_frame_ok(samples[1], expected, 319, 240, 957, "transferred frame")
     end
 
+    it "attaches ports to a jpeg source and sinks in the pipeline" do
+        self.expect_execution_default_timeout = 600
+
+        # jpeg = syskit_deploy_configure_and_start(jpeg_generator_m)
+        # samples = expect_execution.to do
+        #     have_new_samples(jpeg.out_port, 2)
+        #     #  have_new_samples(jpeg_cmp.jpeg_target_child.out_port, 2)]
+        # end
+
+        jpeg_cmp = syskit_deploy_configure_and_start(jpeg_cmp_m)
+        samples = expect_execution.to do
+            [have_new_samples(jpeg_cmp.jpeg_generator_child.out_port, 2),
+             have_new_samples(jpeg_cmp.jpeg_target_child.out_port, 2)]
+        end
+    end
+
     def generator_m(width = 320, height = 240)
         OroGen.gstreamer.Task.with_dynamic_service("image_source", as: "out")
               .with_arguments(
                   outputs: [{ name: "out", frame_mode: "MODE_RGB" }],
                   pipeline: <<~PIPELINE
-                      videotestsrc pattern=colors !
+                      videotestsrc !
                       video/x-raw,width=#{width},height=#{height} ! queue !
                           videoconvert ! appsink name=out
                   PIPELINE
@@ -82,6 +98,42 @@ describe OroGen.gstreamer.Task do
         cmp_m.add target_m(width, height), as: "target"
         cmp_m.generator_child.connect_to cmp_m.inverter_child
         cmp_m
+    end
+
+    def jpeg_generator_m(width = 320, height = 240)
+        OroGen.gstreamer.Task.with_dynamic_service("image_source", as: "out")
+              .with_arguments(
+                  outputs: [{ name: "out", frame_mode: "MODE_JPEG" }],
+                  pipeline: <<~PIPELINE
+                      videotestsrc pattern=colors !
+                      video/x-raw,width=#{width},height=#{height} ! queue !
+                      jpegenc ! appsink name=out
+                  PIPELINE
+              )
+              .deployed_as("generator")
+    end
+
+    def jpeg_target_m
+        OroGen.gstreamer.Task
+              .with_dynamic_service("image_sink", as: "in")
+              .with_dynamic_service("image_source", as: "out")
+              .with_arguments(
+                  inputs: [{ name: "in" }],
+                  outputs: [{ name: "out", frame_mode: "MODE_RGB" }],
+                  pipeline: <<~PIPELINE
+                      appsrc name=in ! jpegdec ! videoconvert ! queue !
+                          appsink name=out
+                  PIPELINE
+              )
+              .deployed_as("target")
+    end
+
+    def jpeg_cmp_m(width = 320, height = 240)
+        jpeg_cmp_m = Syskit::Composition.new_submodel
+        jpeg_cmp_m.add jpeg_generator_m(width, height), as: "jpeg_generator"
+        jpeg_cmp_m.add jpeg_target_m, as: "jpeg_target"
+        jpeg_cmp_m.jpeg_generator_child.connect_to jpeg_cmp_m.jpeg_target_child
+        jpeg_cmp_m
     end
 
     def assert_frame_ok(frame, expected_data, width, height, row_size, description)

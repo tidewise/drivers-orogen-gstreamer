@@ -88,9 +88,20 @@ namespace gstreamer {
 
         static GstFlowReturn sourcePushSample(GstElement* sink, ConfiguredOutput** data);
         static GstFlowReturn sinkNewSample(GstElement* sink, ConfiguredOutput* data);
-        void processInputs();
-        void pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
+        static bool sinkRawFrame(
+            GstMapInfo& mapInfo,
+            GstVideoInfo& videoInfo,
+            Common::ConfiguredOutput* data,
+            std::unique_ptr<base::samples::frame::Frame>& frame);
+        static bool sinkCompressedFrame(
+            GstMapInfo& mapInfo,
+            GstVideoInfo& videoInfo,
+            Common::ConfiguredOutput* data,
+            std::unique_ptr<base::samples::frame::Frame>& frame);
 
+        void processInputs();
+        void pushRawFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
+        void pushCompressedFrame(GstElement* element, Frame const& frame);
         class DynamicPort {
             RTT::TaskContext* m_task = nullptr;
             RTT::base::PortInterface* m_port = nullptr;

@@ -121,12 +121,18 @@ void Common::configureOutput(GstElement* pipeline,
     }
     GstUnrefGuard<GstElement> refguard(appsink);
 
-    auto format = rawModeToGSTVideoFormat(frame_mode);
-    GstCaps* caps = gst_caps_new_simple("video/x-raw",
-        "format",
-        G_TYPE_STRING,
-        gst_video_format_to_string(format),
-        NULL);
+    GstCaps* caps;
+    if (frame_mode == base::samples::frame::MODE_JPEG) {
+        caps = gst_caps_new_simple("image/jpeg", NULL);
+    }
+    else {
+        auto format = rawModeToGSTVideoFormat(frame_mode);
+        caps = gst_caps_new_simple("video/x-raw",
+            "format",
+            G_TYPE_STRING,
+            gst_video_format_to_string(format),
+            NULL);
+    }
     if (!caps) {
         throw std::runtime_error("failed to generate caps");
     }
@@ -186,7 +192,6 @@ void Common::waitFirstFrames(base::Time const& deadline)
         configuredInput.frameMode = configuredInput.frame->frame_mode;
         configuredInput.width = configuredInput.frame->size.width;
         configuredInput.height = configuredInput.frame->size.height;
-
         GstCaps* caps = frameModeToGSTCaps(configuredInput.frameMode);
         GstStructure* str = gst_caps_get_structure(caps, 0);
         gst_structure_set(str,
@@ -201,7 +206,11 @@ void Common::waitFirstFrames(base::Time const& deadline)
         g_object_set(configuredInput.appsrc, "caps", caps, NULL);
 
         gst_video_info_from_caps(&configuredInput.info, caps);
-        pushFrame(configuredInput.appsrc, configuredInput.info, *configuredInput.frame);
+        configuredInput.frame->frame_mode < base::samples::frame::COMPRESSED_MODES
+            ? pushRawFrame(configuredInput.appsrc,
+                  configuredInput.info,
+                  *configuredInput.frame)
+            : pushCompressedFrame(configuredInput.appsrc, *configuredInput.frame);
     }
 }
 
@@ -217,19 +226,34 @@ void Common::processInputs()
                 throw std::runtime_error("input frame changed parameters");
             }
 
-            pushFrame(configuredInput.appsrc,
-                configuredInput.info,
-                *configuredInput.frame);
+            configuredInput.frame->frame_mode < base::samples::frame::COMPRESSED_MODES
+                ? pushRawFrame(configuredInput.appsrc,
+                      configuredInput.info,
+                      *configuredInput.frame)
+                : pushCompressedFrame(configuredInput.appsrc, *configuredInput.frame);
         }
     }
 }
+void Common::pushCompressedFrame(GstElement* element, Frame const& frame)
+{
+    /* Create a buffer to wrap the last received image */
+    GstBuffer* buffer = gst_buffer_new_and_alloc(frame.image.size());
+    GstUnrefGuard<GstBuffer> unref_guard(buffer);
+    gst_buffer_fill(buffer, 0, frame.image.data(), frame.image.size());
 
-void Common::pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame)
+    GstFlowReturn ret;
+    g_signal_emit_by_name(element, "push-buffer", buffer, &ret);
+
+    if (ret != GST_FLOW_OK) {
+        throw std::runtime_error("failed to push buffer");
+    }
+}
+
+void Common::pushRawFrame(GstElement* element, GstVideoInfo& info, Frame const& frame)
 {
     /* Create a buffer to wrap the last received image */
     GstBuffer* buffer = gst_buffer_new_and_alloc(info.size);
     GstUnrefGuard<GstBuffer> unref_guard(buffer);
-
     int sourceStride = frame.getRowSize();
     int targetStride = GST_VIDEO_INFO_PLANE_STRIDE(&info, 0);
     if (targetStride != sourceStride) {
@@ -275,9 +299,6 @@ GstFlowReturn Common::sinkNewSample(GstElement* sink, Common::ConfiguredOutput* 
         gst_video_info_from_caps(&videoInfo, caps);
     }
 
-    int width = videoInfo.width;
-    int height = videoInfo.height;
-
     GstMemory* memory = gst_buffer_get_memory(buffer, 0);
     GstUnrefGuard<GstMemory> memory_unref_guard(memory);
 
@@ -288,18 +309,41 @@ GstFlowReturn Common::sinkNewSample(GstElement* sink, Common::ConfiguredOutput* 
     GstMemoryUnmapGuard memory_unmap_guard(memory, mapInfo);
 
     std::unique_ptr<Frame> frame(data->frame.write_access());
-    frame->init(width, height, 8, data->frameMode);
+
+    bool status = frame->frame_mode < base::samples::frame::COMPRESSED_MODES
+                ? sinkRawFrame(mapInfo, videoInfo, data, frame)
+                : sinkCompressedFrame(mapInfo, videoInfo, data, frame);
+
+    if (status == false) {
+        return GST_FLOW_OK;
+    }
 
     frame->time = base::Time::now();
     frame->frame_status = base::samples::frame::STATUS_VALID;
 
+    data->frame.reset(frame.release());
+    data->port->write(data->frame);
+    return GST_FLOW_OK;
+}
+
+bool Common::sinkRawFrame(GstMapInfo& mapInfo,
+    GstVideoInfo& videoInfo,
+    Common::ConfiguredOutput* data,
+    std::unique_ptr<Frame>& frame)
+{
+    int width = videoInfo.width;
+    int height = videoInfo.height;
+
+    frame->init(width, height, 8, data->frameMode);
+
     uint8_t* pixels = &(frame->image[0]);
+
     if (frame->getNumberOfBytes() > mapInfo.size) {
         data->task->queueError(
             "Inconsistent number of bytes. Rock's image type calculated " +
             to_string(frame->getNumberOfBytes()) + " while GStreamer only has " +
             to_string(mapInfo.size));
-        return GST_FLOW_OK;
+        return false;
     }
 
     int sourceStride = videoInfo.stride[0];
@@ -314,9 +358,24 @@ GstFlowReturn Common::sinkNewSample(GstElement* sink, Common::ConfiguredOutput* 
     else {
         std::memcpy(pixels, mapInfo.data, frame->getNumberOfBytes());
     }
-    data->frame.reset(frame.release());
-    data->port->write(data->frame);
-    return GST_FLOW_OK;
+    return true;
+}
+
+bool Common::sinkCompressedFrame(
+    GstMapInfo& mapInfo,
+    GstVideoInfo& videoInfo,
+    Common::ConfiguredOutput* data,
+    std::unique_ptr<Frame>& frame)
+{
+    int width = videoInfo.width;
+    int height = videoInfo.height;
+
+    frame->init(width, height, 8, data->frameMode, 0UL, mapInfo.size);
+
+    uint8_t* pixels = &(frame->image[0]);
+
+    std::memcpy(pixels, mapInfo.data, frame->getNumberOfBytes());
+    return true;
 }
 
 template <typename Port>
