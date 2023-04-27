@@ -56,15 +56,15 @@ namespace gstreamer {
 
     struct GstMemoryUnmapGuard {
         GstMemory* memory;
-        GstMapInfo& mapInfo;
-        GstMemoryUnmapGuard(GstMemory* memory, GstMapInfo& mapInfo)
+        GstMapInfo& map_info;
+        GstMemoryUnmapGuard(GstMemory* memory, GstMapInfo& map_info)
             : memory(memory)
-            , mapInfo(mapInfo)
+            , map_info(map_info)
         {
         }
         ~GstMemoryUnmapGuard()
         {
-            gst_memory_unmap(memory, &mapInfo);
+            gst_memory_unmap(memory, &map_info);
         }
     };
 

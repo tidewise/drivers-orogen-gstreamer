@@ -38,12 +38,6 @@ describe OroGen.gstreamer.Task do
     it "attaches ports to a jpeg source and sinks in the pipeline" do
         self.expect_execution_default_timeout = 600
 
-        # jpeg = syskit_deploy_configure_and_start(jpeg_generator_m)
-        # samples = expect_execution.to do
-        #     have_new_samples(jpeg.out_port, 2)
-        #     #  have_new_samples(jpeg_cmp.jpeg_target_child.out_port, 2)]
-        # end
-
         jpeg_cmp = syskit_deploy_configure_and_start(jpeg_cmp_m)
         samples = expect_execution.to do
             [have_new_samples(jpeg_cmp.jpeg_generator_child.out_port, 2),
@@ -105,7 +99,7 @@ describe OroGen.gstreamer.Task do
               .with_arguments(
                   outputs: [{ name: "out", frame_mode: "MODE_JPEG" }],
                   pipeline: <<~PIPELINE
-                      videotestsrc pattern=colors !
+                      videotestsrc !
                       video/x-raw,width=#{width},height=#{height} ! queue !
                       jpegenc ! appsink name=out
                   PIPELINE
@@ -121,7 +115,7 @@ describe OroGen.gstreamer.Task do
                   inputs: [{ name: "in" }],
                   outputs: [{ name: "out", frame_mode: "MODE_RGB" }],
                   pipeline: <<~PIPELINE
-                      appsrc name=in ! jpegdec ! videoconvert ! queue !
+                      appsrc name=in ! queue!  jpegdec ! videoconvert ! queue !
                           appsink name=out
                   PIPELINE
               )

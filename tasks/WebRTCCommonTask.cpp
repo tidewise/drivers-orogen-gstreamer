@@ -342,18 +342,18 @@ void WebRTCCommonTask::processRemoteDescription(GstElement* webrtcbin,
     SignallingMessage const& msg,
     GstWebRTCSDPType sdp_type)
 {
-    GstSDPMessage* sdpMsg;
-    int ret = gst_sdp_message_new(&sdpMsg);
+    GstSDPMessage* sdp_msg;
+    int ret = gst_sdp_message_new(&sdp_msg);
     string sdp = msg.message;
     g_assert_cmphex(ret, ==, GST_SDP_OK);
-    ret = gst_sdp_message_parse_buffer((guint8*)sdp.c_str(), sdp.size(), sdpMsg);
+    ret = gst_sdp_message_parse_buffer((guint8*)sdp.c_str(), sdp.size(), sdp_msg);
     if (ret != GST_SDP_OK) {
         LOG_ERROR_S << "could not parse SDP string: " << sdp;
         return;
     }
 
     GstWebRTCSessionDescription* description =
-        gst_webrtc_session_description_new(sdp_type, sdpMsg);
+        gst_webrtc_session_description_new(sdp_type, sdp_msg);
     g_assert_nonnull(description);
 
     GstPromise* promise = gst_promise_new();
