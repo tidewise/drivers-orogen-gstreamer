@@ -63,6 +63,15 @@ These are treated as bugs, and will be fixed in future versions of the package.
   with renegotiation if the polite peer (e.g. the ReceiveTask in tests) creates
   a channel.
 
+When using jpegenc/jpegdec it is necessary to add `video/x-raw,format=(string)I420` and
+ `videoconvert` in the pipeline otherwise gstreamer will crash. Here is an example:
+ ```
+  videotestsrc num-buffers=150 ! video/x-raw,width=320,height=240 ! jpegenc ! jpegdec !
+  'video/x-raw,format=(string)I420' ! videoconvert ! 'video/x-raw,format=(string)RGB' !
+  videoconvert ! autovideosink
+
+ ```
+
 ## Debugging the Components
 
 Run Syskit with GST_DEBUG to 2 to see errors in the text log, up to 6 for a whole trace.
