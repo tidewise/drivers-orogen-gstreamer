@@ -33,7 +33,7 @@ bool WebRTCReceiveTask::configureHook()
 
     auto config = _signalling.get();
     if (!config.polite && !config.remote_peer_id.empty()) {
-        mPipeline = createPipeline(config.remote_peer_id);
+        m_pipeline = createPipeline(config.remote_peer_id);
     }
 
     return true;
@@ -43,7 +43,7 @@ bool WebRTCReceiveTask::startHook()
     if (!WebRTCReceiveTaskBase::startHook())
         return false;
 
-    if (mPipeline) {
+    if (m_pipeline) {
         startPipeline();
     }
 
@@ -72,10 +72,10 @@ void WebRTCReceiveTask::processSignallingMessage(SignallingMessage const& messag
             return;
         }
 
-        if (mPipeline) {
+        if (m_pipeline) {
             destroyPipeline();
         }
-        mPipeline = createPipeline(message.from);
+        m_pipeline = createPipeline(message.from);
         startPipeline();
         return;
     }
@@ -86,10 +86,10 @@ void WebRTCReceiveTask::processSignallingMessage(SignallingMessage const& messag
             return;
         }
 
-        if (mPipeline) {
+        if (m_pipeline) {
             destroyPipeline();
         }
-        mPipeline = createPipeline(message.from);
+        m_pipeline = createPipeline(message.from);
         startPipeline();
     }
 
@@ -124,7 +124,7 @@ void WebRTCReceiveTask::errorHook()
 }
 void WebRTCReceiveTask::stopHook()
 {
-    if (mPipeline) {
+    if (m_pipeline) {
         destroyPipeline();
     }
 
@@ -215,7 +215,7 @@ void WebRTCReceiveTask::onIncomingStream(GstElement* webrtcbin, GstPad* pad)
 
     auto const& peer = m_peers[webrtcbin];
     GstElement* bin = gst_bin_new((peer.peer_id + "_receivebin").c_str());
-    gst_bin_add(GST_BIN(mPipeline), bin);
+    gst_bin_add(GST_BIN(m_pipeline), bin);
 
     GstElement* decodebin = gst_element_factory_make("decodebin", NULL);
     g_signal_connect(decodebin,

@@ -56,15 +56,15 @@ namespace gstreamer {
 
     struct GstMemoryUnmapGuard {
         GstMemory* memory;
-        GstMapInfo& mapInfo;
-        GstMemoryUnmapGuard(GstMemory* memory, GstMapInfo& mapInfo)
+        GstMapInfo& map_info;
+        GstMemoryUnmapGuard(GstMemory* memory, GstMapInfo& map_info)
             : memory(memory)
-            , mapInfo(mapInfo)
+            , map_info(map_info)
         {
         }
         ~GstMemoryUnmapGuard()
         {
-            gst_memory_unmap(memory, &mapInfo);
+            gst_memory_unmap(memory, &map_info);
         }
     };
 
@@ -137,6 +137,17 @@ namespace gstreamer {
         return caps;
     }
 
+    inline GstCaps* jpegModeToGSTCaps(base::samples::frame::frame_mode_t frame_mode)
+    {
+        GstCaps* caps =
+            gst_caps_new_simple("image/jpeg", NULL);
+        if (!caps) {
+            throw std::runtime_error("failed to generate caps");
+        }
+
+        return caps;
+    }
+
     inline bool isFrameModeBayer(base::samples::frame::frame_mode_t frame_mode)
     {
         switch (frame_mode) {
@@ -154,6 +165,9 @@ namespace gstreamer {
     {
         if (isFrameModeBayer(frame_mode)) {
             return bayerModeToGSTCaps(frame_mode);
+        }
+        else if (frame_mode == base::samples::frame::MODE_JPEG) {
+            return jpegModeToGSTCaps(frame_mode);
         }
         else {
             return rawModeToGSTCaps(frame_mode);

@@ -35,8 +35,8 @@ namespace gstreamer {
     class Common : public CommonBase {
         friend class CommonBase;
 
-        RTT::os::Mutex mSync;
-        std::vector<std::string> mErrorQueue;
+        RTT::os::Mutex m_sync;
+        std::vector<std::string> m_error_queue;
 
     protected:
         typedef base::samples::frame::Frame Frame;
@@ -50,11 +50,11 @@ namespace gstreamer {
             ROPtrFrame frame;
             Common* task;
             Port* port;
-            FrameMode frameMode;
+            FrameMode frame_mode;
 
             ConfiguredPort(Common&,
                 Port&,
-                FrameMode frameMode = base::samples::frame::MODE_UNDEFINED);
+                FrameMode frame_mode = base::samples::frame::MODE_UNDEFINED);
         };
 
         struct ConfiguredInput : ConfiguredPort<FrameInputPort> {
@@ -67,10 +67,10 @@ namespace gstreamer {
         };
         typedef ConfiguredPort<FrameOutputPort> ConfiguredOutput;
 
-        std::list<ConfiguredInput> mConfiguredInputs;
-        std::list<ConfiguredOutput> mConfiguredOutputs;
+        std::list<ConfiguredInput> m_configured_inputs;
+        std::list<ConfiguredOutput> m_configured_outputs;
 
-        GstElement* mPipeline = nullptr;
+        GstElement* m_pipeline = nullptr;
 
         void configureOutput(GstElement* pipeline,
             std::string const& appsink_name,
@@ -88,9 +88,20 @@ namespace gstreamer {
 
         static GstFlowReturn sourcePushSample(GstElement* sink, ConfiguredOutput** data);
         static GstFlowReturn sinkNewSample(GstElement* sink, ConfiguredOutput* data);
-        void processInputs();
-        void pushFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
+        static bool sinkRawFrame(
+            GstMapInfo& map_info,
+            GstVideoInfo& video_info,
+            Common::ConfiguredOutput* data,
+            std::unique_ptr<base::samples::frame::Frame>& frame);
+        static bool sinkCompressedFrame(
+            GstMapInfo& map_info,
+            GstVideoInfo& video_info,
+            Common::ConfiguredOutput* data,
+            std::unique_ptr<base::samples::frame::Frame>& frame);
 
+        void processInputs();
+        void pushRawFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
+        void pushCompressedFrame(GstElement* element, Frame const& frame);
         class DynamicPort {
             RTT::TaskContext* m_task = nullptr;
             RTT::base::PortInterface* m_port = nullptr;

@@ -2,7 +2,7 @@ templates/*
 .orogen/*
 *~
 .*.swp
-build/*
+build/
 
 *autobuild-stamp
 
