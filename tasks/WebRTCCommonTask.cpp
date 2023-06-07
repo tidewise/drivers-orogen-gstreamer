@@ -549,6 +549,11 @@ WebRTCCommonTask::Peer& WebRTCCommonTask::configureWebRTCBin(string const& peer_
     peer.last_signalling_message = base::Time::now();
 
     g_object_set(webrtcbin, "bundle-policy", m_signalling_config.bundle_policy, nullptr);
+    g_object_set(webrtcbin, "latency", 50, NULL);
+
+    GstElement* rtpbin = gst_bin_get_by_name(GST_BIN(webrtcbin), "rtpbin");
+    g_object_set(rtpbin, "drop-on-latency", true, NULL);
+    gst_object_unref(rtpbin);
 
     g_signal_connect(webrtcbin,
         "notify::signaling-state",
