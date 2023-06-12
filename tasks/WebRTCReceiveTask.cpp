@@ -167,6 +167,8 @@ void WebRTCReceiveTask::handleVideoStream(GstElement* bin, GstPad* pad)
     GstElement* q = gst_element_factory_make("queue", NULL);
     GstElement* conv = gst_element_factory_make("videoconvert", NULL);
     GstElement* sink = gst_element_factory_make("appsink", "video_out");
+    // The max buffers is set to 1, so it gets the first value and send
+    // it directly, so it disables the buffer behavior
     g_object_set(sink, "max-buffers", 1, NULL);
     g_object_set(sink, "drop", true, NULL);
 
