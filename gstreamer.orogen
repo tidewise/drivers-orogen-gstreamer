@@ -74,6 +74,12 @@ task_context "WebRTCCommonTask", subclasses: "Common" do
     # Configuration of the signalling process
     property "signalling", "/gstreamer/SignallingConfig"
 
+    # The GStreamer object latency
+    property "latency", "base/Time"
+
+    # If the Gstreamer object drops on latency
+    property "m_drop_on_latency", "bool"
+
     # Reception of WebRTC signalling messages
     input_port("signalling_in", "/webrtc_base/SignallingMessage")
         .needs_reliable_connection

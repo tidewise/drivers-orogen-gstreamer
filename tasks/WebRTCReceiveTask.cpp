@@ -222,7 +222,6 @@ void WebRTCReceiveTask::onIncomingStream(GstElement* webrtcbin, GstPad* pad)
     gst_bin_add(GST_BIN(m_pipeline), bin);
 
     GstElement* decodebin = gst_element_factory_make("decodebin", NULL);
-    g_object_set(decodebin, "max-size-buffers", 1, NULL);
     g_signal_connect(decodebin,
         "pad-added",
         G_CALLBACK(callbackIncomingDecodebinStream),

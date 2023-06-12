@@ -43,6 +43,8 @@ namespace gstreamer {
         };
 
         base::Time m_last_offer_request;
+        base::Time m_latency;
+        bool m_drop_on_latency;
 
         typedef std::map<GstElement*, Peer> PeerMap;
         PeerMap m_peers;
