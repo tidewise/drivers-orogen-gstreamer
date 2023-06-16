@@ -164,18 +164,20 @@ GstElement* WebRTCReceiveTask::createPipeline(string const& peer_id)
 
 void WebRTCReceiveTask::handleVideoStream(GstElement* bin, GstPad* pad)
 {
-    GstElement* q = gst_element_factory_make("queue", NULL);
     GstElement* conv = gst_element_factory_make("videoconvert", NULL);
     GstElement* sink = gst_element_factory_make("appsink", "video_out");
+    // The max buffers is set to 1, so it gets the first value and send
+    // it directly, so it disables the buffer behavior
+    g_object_set(sink, "max-buffers", 1, NULL);
+    g_object_set(sink, "drop", true, NULL);
 
-    gst_bin_add_many(GST_BIN(bin), q, conv, sink, NULL);
-    gst_element_sync_state_with_parent(q);
+    gst_bin_add_many(GST_BIN(bin), conv, sink, NULL);
     gst_element_sync_state_with_parent(conv);
     gst_element_sync_state_with_parent(sink);
-    gst_element_link_many(q, conv, sink, NULL);
+    gst_element_link_many(conv, sink, NULL);
     configureOutput(bin, "video_out", _frame_mode.get(), false, _video_out);
 
-    GstPad* qpad = gst_element_get_static_pad(q, "sink");
+    GstPad* qpad = gst_element_get_static_pad(conv, "sink");
 
     GstPadLinkReturn ret = gst_pad_link(pad, qpad);
     g_assert_cmphex(ret, ==, GST_PAD_LINK_OK);
