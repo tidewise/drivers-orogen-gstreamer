@@ -132,6 +132,8 @@ end
 task_context "WebRTCReceiveTask", subclasses: "WebRTCCommonTask" do
     # Frame mode of the output video
     property "frame_mode", "/base/samples/frame/frame_mode_t", "MODE_RGB"
+    # Max size time parameter of queue that comes after decodebin in microseconds
+    property "decode_queue_max_size_time", "base/Time"
 
     output_port "video_out", ro_ptr("/base/samples/frame/Frame")
     output_port "stats", "/gstreamer/WebRTCPeerStats"

@@ -35,6 +35,7 @@ bool WebRTCReceiveTask::configureHook()
     if (!config.polite && !config.remote_peer_id.empty()) {
         m_pipeline = createPipeline(config.remote_peer_id);
     }
+    m_decode_queue_max_size_time = _decode_queue_max_size_time.get();
 
     return true;
 }
@@ -219,15 +220,24 @@ void WebRTCReceiveTask::onIncomingStream(GstElement* webrtcbin, GstPad* pad)
     GstElement* bin = gst_bin_new((peer.peer_id + "_receivebin").c_str());
     gst_bin_add(GST_BIN(m_pipeline), bin);
 
+    GstElement* q = gst_element_factory_make("queue", NULL);
     GstElement* decodebin = gst_element_factory_make("decodebin", NULL);
+    gst_bin_add_many(GST_BIN(bin), decodebin, q, NULL);
+    gst_element_link_many(q, decodebin, NULL);
+
+    g_object_set(q, "leaky", 1, NULL); // downstream - drop old buffers
+    g_object_set(q,
+        "max-size-time",
+        m_decode_queue_max_size_time.toMicroseconds() * 1000,
+        NULL);
+
     g_signal_connect(decodebin,
         "pad-added",
         G_CALLBACK(callbackIncomingDecodebinStream),
         this);
-    gst_bin_add(GST_BIN(bin), decodebin);
 
-    GstUnrefGuard<GstPad> decode_sink(gst_element_get_static_pad(decodebin, "sink"));
-    auto bin_pad = gst_ghost_pad_new("sink", decode_sink.get());
+    GstUnrefGuard<GstPad> q_sink(gst_element_get_static_pad(q, "sink"));
+    auto bin_pad = gst_ghost_pad_new("sink", q_sink.get());
     gst_element_add_pad(bin, bin_pad);
     gst_pad_link(pad, bin_pad);
 

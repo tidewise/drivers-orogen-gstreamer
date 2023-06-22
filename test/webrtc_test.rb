@@ -46,7 +46,6 @@ describe OroGen.gstreamer.WebRTCCommonTask do
             receive_child.signalling_out_port.connect_to \
                 send_child.signalling_in_port, type: :buffer, size: 100
         end
-
     end
 
     after do
