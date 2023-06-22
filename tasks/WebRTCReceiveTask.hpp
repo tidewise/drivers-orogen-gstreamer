@@ -3,6 +3,7 @@
 #ifndef GSTREAMER_WEBRTCRECEIVETASK_TASK_HPP
 #define GSTREAMER_WEBRTCRECEIVETASK_TASK_HPP
 
+#include "base/Time.hpp"
 #include "gstreamer/WebRTCReceiveTaskBase.hpp"
 #include <gst/gst.h>
 
@@ -30,6 +31,8 @@ namespace gstreamer {
         friend class WebRTCReceiveTaskBase;
 
     protected:
+        base::Time m_decode_queue_max_size_time;
+
         void updatePeersStats() override;
 
         std::string getCurrentPeer() const;
