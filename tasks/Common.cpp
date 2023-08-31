@@ -123,7 +123,7 @@ void Common::configureOutput(GstElement* pipeline,
 
     GstCaps* caps;
     if (frame_mode == base::samples::frame::MODE_JPEG) {
-        caps = gst_caps_new_simple("image/jpeg", NULL);
+        caps = gst_caps_new_empty_simple("image/jpeg");
     }
     else {
         auto format = rawModeToGSTVideoFormat(frame_mode);

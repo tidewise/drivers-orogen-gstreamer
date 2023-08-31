@@ -140,7 +140,7 @@ namespace gstreamer {
     inline GstCaps* jpegModeToGSTCaps(base::samples::frame::frame_mode_t frame_mode)
     {
         GstCaps* caps =
-            gst_caps_new_simple("image/jpeg", NULL);
+            gst_caps_new_empty_simple("image/jpeg");
         if (!caps) {
             throw std::runtime_error("failed to generate caps");
         }
