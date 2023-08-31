@@ -123,7 +123,7 @@ void Common::configureOutput(GstElement* pipeline,
 
     GstCaps* caps;
     if (frame_mode == base::samples::frame::MODE_JPEG) {
-        caps = gst_caps_new_simple("image/jpeg", NULL);
+        caps = gst_caps_new_empty_simple("image/jpeg");
     }
     else {
         auto format = rawModeToGSTVideoFormat(frame_mode);
@@ -308,9 +308,12 @@ GstFlowReturn Common::sinkNewSample(GstElement* sink, Common::ConfiguredOutput* 
     }
     GstMemoryUnmapGuard memory_unmap_guard(memory, map_info);
 
-    std::unique_ptr<Frame> frame(data->frame.write_access());
+    std::unique_ptr<Frame> frame(data->frame.try_write_access());
+    if (!frame) {
+        frame.reset(new base::samples::frame::Frame());
+    }
 
-    bool status = frame->frame_mode < base::samples::frame::COMPRESSED_MODES
+    bool status = data->frame_mode < base::samples::frame::COMPRESSED_MODES
                       ? sinkRawFrame(map_info, video_info, data, frame)
                       : sinkCompressedFrame(map_info, video_info, data, frame);
 
@@ -334,7 +337,7 @@ bool Common::sinkRawFrame(GstMapInfo& map_info,
     int width = video_info.width;
     int height = video_info.height;
 
-    frame->init(width, height, 8, data->frame_mode);
+    frame->init(width, height, 8, data->frame_mode, -1);
 
     uint8_t* pixels = &(frame->image[0]);
 
@@ -369,7 +372,7 @@ bool Common::sinkCompressedFrame(GstMapInfo& map_info,
     int width = video_info.width;
     int height = video_info.height;
 
-    frame->init(width, height, 8, data->frame_mode, 0UL, map_info.size);
+    frame->init(width, height, 8, data->frame_mode, -1, map_info.size);
 
     uint8_t* pixels = &(frame->image[0]);
     std::memcpy(pixels, map_info.data, frame->getNumberOfBytes());
