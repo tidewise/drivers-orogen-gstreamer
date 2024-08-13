@@ -58,26 +58,25 @@ describe OroGen.gstreamer.Task do
     end
 
     def inverter_m
-        OroGen.gstreamer.Task.with_dynamic_service("image_sink", as: "in")
+        OroGen.gstreamer.Task.with_dynamic_service("image_sink", as: "in").with_dynamic_service("image_source", as: "inverted_out")
               .with_arguments(
                   inputs: [{ name: "in" }],
+                  outputs: [{ name: "inverted_out", frame_mode: "MODE_RGB" }],
                   pipeline: <<~PIPELINE
                       appsrc format=3 name=in ! queue ! videoflip method=vertical-flip !
-                          rtpvrawpay ! udpsink host=127.0.0.1 port=9384
+                          appsink name=inverted_out
                   PIPELINE
               )
               .deployed_as("inverter")
     end
 
     def target_m(width = 320, height = 240)
-        OroGen.gstreamer.Task.with_dynamic_service("image_source", as: "out")
+        OroGen.gstreamer.Task.with_dynamic_service("image_source", as: "out").with_dynamic_service("image_sink", as: "inverted_in")
               .with_arguments(
+                  inputs: [{ name: "inverted_in" }],
                   outputs: [{ name: "out", frame_mode: "MODE_RGB" }],
                   pipeline: <<~PIPELINE
-                      udpsrc port=9384 caps="application/x-rtp, media=(string)video,
-                          clock-rate=(int)90000, encoding-name=(string)RAW,
-                          width=(string)#{width}, height=(string)#{height}" !
-                          rtpvrawdepay ! queue ! videoflip method=vertical-flip !
+                      appsrc format=3 name=inverted_in ! queue ! videoflip method=vertical-flip !
                           appsink name=out
                   PIPELINE
               )
@@ -90,6 +89,7 @@ describe OroGen.gstreamer.Task do
         cmp_m.add inverter_m, as: "inverter"
         cmp_m.add target_m(width, height), as: "target"
         cmp_m.generator_child.connect_to cmp_m.inverter_child
+        cmp_m.inverter_child.connect_to cmp_m.target_child
         cmp_m
     end
 
