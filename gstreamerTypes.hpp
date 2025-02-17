@@ -108,6 +108,131 @@ namespace gstreamer {
          */
         bool binary_in = false;
     };
+
+    /** Response from each connected peer to the RTP pipeline */
+    struct ReceivedResponse {
+        /** The SSRC of this source */
+        int rb_ssrc;
+        /** The SSRC of the sender of this RR */
+        int rb_sender_ssrc;
+        /** Lost 8-bit fraction */
+        int rb_fractionlost;
+        /** Lost packets */
+        int rb_packetslost;
+        /** Highest received seqnum */
+        int rb_exthighestseq;
+        /** Reception jitter (in clock rate units) */
+        int rb_jitter;
+        /** Last SR time (seconds in NTP Short Format, 16.16 fixed point) */
+        int rb_lsr;
+        /** Delay since last SR (seconds in NTP Short Format, 16.16 fixed point) */
+        int rb_dlsr;
+        /** The round-trip time (seconds in NTP Short Format, 16.16 fixed point) */
+        int rb_round_trip;
+    };
+
+    /** The RTP Stream Statistics
+     *
+     * This is the response when the stats is present on the pipeline
+*/
+    struct RTPStreamStatistics {
+        /** The label of the stream */
+        std::string label;
+
+        // The following fields are always present.
+        /** SSRC of this source */
+        int ssrc;
+        /** Confirmation if the source is a source of the session */
+        bool internal;
+        /** Confirmation if source is validated*/
+        bool validated;
+        /** Confirmation if a bye has been received */
+        bool received_bye;
+        /** Confirmation if the source was found as CSRC */
+        bool is_csrc;
+        /** Confirmation if the source is a sender */
+        bool is_sender;
+        /** First seqnum if known */
+        int seqnum_base;
+        /** Clock rate of the media */
+        int clock_rate;
+
+        // The following fields are only present when known.
+        /** Origin of last received RTP Packet - Only present when known */
+        std::string rtp_from;
+        /** Origin of last received RTP Packet - Only present when known */
+        std::string rtcp_from;
+
+        // The following fields make sense for internal sources and will only increase
+        // when "is-sender" is TRUE.
+        /** Number of payload bytes we sent */
+        int octets_sent;
+        /** Number of packets we sent */
+        int packets_sent;
+
+        // The following fields make sense for non-internal sources and will only increase
+        // when "is-sender" is TRUE.
+        /** Total number of payload bytes received */
+        int octets_received;
+        /** Total number of packets received */
+        int packets_received;
+        /** Total number of bytes received including lower level headers overhead */
+        int bytes_received;
+
+        // Following fields are updated when "is-sender" is TRUE.
+        /** Bitrate in bits/sec */
+        int bitrate;
+        /** Estimated amount of packets lost */
+        int packets_lost;
+        /** Estimated Jitter (in clock rate units) */
+        int jitter;
+
+        // Documentation not available
+        int sent_pli_count;
+        int recv_pli_count;
+        int sent_fir_count;
+        int recv_fir_count;
+        int sent_nack_count;
+        int recv_nack_count;
+        int recv_packet_rate;
+
+        // The last SR report this source sent. Only updates when "is-sender" is TRUE.
+        /** The source has sent SR */
+        bool have_sr;
+        /** NTP Time of the SR (in NTP Timestamp Format, 32.32 fixed point) */
+        int in_ntptime;
+        /** RTP Time of SR (in clock rate units)*/
+        int sr_rtptime;
+        /** The number of bytes in the SR */
+        int sr_octet_count;
+        /** The number of packets in the SR */
+        int sr_packet_count;
+
+        // The following fields are only present for non-internal sources and represent
+        // the content of the last RB packet that was sent to this source. These values
+        // are only updated when the source is sending.
+        /** Confirmation if a RB has been sent */
+        bool sent_rb;
+        /** calculated lost 8-bit fraction */
+        int sent_rb_fractionlost;
+        /** Lost Packets */
+        int sent_rb_packetslost;
+        /** Last seen seqnum */
+        int sent_rb_exthighestseq;
+        /** Jitter in clock rate units */
+        int sent_rb_jitter;
+        /** Last SR time (seconds in NTP Short Format, 16.16 fixed point) */
+        int sent_rb_lsr;
+        /** delay since last SR (seconds in NTP Short Format, 16.16 fixed point) */
+        int sent_rb_dlsr;
+
+        // The following field is present only for internal sources and contains an array
+        // of the the most recent receiver reports from each peer. In unicast scenarios
+        // this will be a single entry that is identical to the data provided by the
+        // have-rb and rb-* fields, but in multicast there will be one entry in the array
+        // for each peer that is sending receiver reports.
+        std::vector<ReceivedResponse> received_krr;        
+    };
 }
 
 #endif

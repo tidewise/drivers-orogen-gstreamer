@@ -64,6 +64,13 @@ task_context "Task", subclasses: "Common" do
     port_driven
 end
 
+task_context "RTPTask", subclasses: "Task" do
+    # Statistics output port
+    output_port "rtp_statistics", "/gstreamer/RTPStreamStatistics"
+
+    port_driven
+end
+
 # Common support for WebRTC
 #
 # This task's implementation is private and not meant to be reused outside
