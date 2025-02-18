@@ -43,17 +43,17 @@ namespace gstreamer {
         /** Fetch the gbooleans and converts it to bool */
         void fetchBoolean(const GstStructure* structure,
             const char* fieldname,
-            bool& boolean);
+            bool *boolean);
 
         /** Fetchs a unsigned int and converts it to int */
         void fetchUnsignedInt(const GstStructure* structure,
             const char* fieldname,
-            int& number);
+            int *number);
 
         /** Fetchs a gstring and converts it to std::string */
         void fetchString(const GstStructure* structure,
             const char* fieldname,
-            std::string& str_var);
+            std::string *str_var);
 
         /** RTP bin element */
         GstElement* m_rtpbin;
