@@ -26,7 +26,7 @@ RTPTask::~RTPTask()
 
 void RTPTask::extractPipelineStatus()
 {
-    GstStructure* stats = NULL;
+    GstStructure stats;
     g_object_get(m_rtpbin, "stats", &stats, NULL);
     fetchUnsignedInt(stats, "ssrc", &m_rtp_statistics.ssrc);
     fetchBoolean(stats, "internal", &m_rtp_statistics.internal);
@@ -73,33 +73,33 @@ void RTPTask::extractPipelineStatus()
     fetchUnsignedInt(stats, "sent_rb_dlsr", &m_rtp_statistics.sent_rb_dlsr);
 }
 
-void RTPTask::fetchBoolean(const GstStructure* structure,
+void RTPTask::fetchBoolean(const GstStructure &structure,
     const char* fieldname,
     bool *boolean)
 {
     gboolean gboolean_value;
-    if (gst_structure_get_boolean(structure, fieldname, &gboolean_value)) {
+    if (gst_structure_get_boolean(&structure, fieldname, &gboolean_value)) {
         *boolean = gboolean_value == TRUE;
     }
     LOG_INFO_S << "Field: \"" << fieldname << "\" not found or not a boolean";
 }
 
-void RTPTask::fetchUnsignedInt(const GstStructure* structure,
+void RTPTask::fetchUnsignedInt(const GstStructure &structure,
     const char* fieldname,
     int *number)
 {
     guint guint_value;
-    if (gst_structure_get_uint(structure, fieldname, &guint_value)) {
+    if (gst_structure_get_uint(&structure, fieldname, &guint_value)) {
         *number = static_cast<int>(guint_value);
     }
     LOG_INFO_S << "Field: \"" << fieldname << "\" not found or not a uint";
 }
 
-void RTPTask::fetchString(const GstStructure* structure,
+void RTPTask::fetchString(const GstStructure &structure,
     const char* fieldname,
     std::string *str_var)
 {
-    const gchar* gstr_value = gst_structure_get_string(structure, fieldname);
+    const gchar* gstr_value = gst_structure_get_string(&structure, fieldname);
     if (gstr_value != nullptr) {
         *str_var = std::string(gstr_value);
     }

@@ -41,17 +41,17 @@ namespace gstreamer {
         void extractPipelineStatus();
 
         /** Fetch the gbooleans and converts it to bool */
-        void fetchBoolean(const GstStructure* structure,
+        void fetchBoolean(const GstStructure &structure,
             const char* fieldname,
             bool *boolean);
 
         /** Fetchs a unsigned int and converts it to int */
-        void fetchUnsignedInt(const GstStructure* structure,
+        void fetchUnsignedInt(const GstStructure &structure,
             const char* fieldname,
             int *number);
 
         /** Fetchs a gstring and converts it to std::string */
-        void fetchString(const GstStructure* structure,
+        void fetchString(const GstStructure &structure,
             const char* fieldname,
             std::string *str_var);
 
