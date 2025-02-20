@@ -65,8 +65,10 @@ task_context "Task", subclasses: "Common" do
 end
 
 task_context "RTPTask", subclasses: "Task" do
+    # The RTP Session and name
+    property "rtp_monitored_sessions", "/gstreamer/RTPMonitoredSessions"
     # Statistics output port
-    output_port "rtp_statistics", "/gstreamer/RTPStreamStatistics"
+    output_port "rtp_statistics", "/std/vector</gstreamer/RTPSessionStatistics>"
 
     port_driven
 end

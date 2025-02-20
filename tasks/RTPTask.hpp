@@ -2,6 +2,7 @@
 #define RTPTASK_HPP
 
 #include "gstreamer/RTPTaskBase.hpp"
+#include "gst/rtp/rtp.h"
 
 namespace gstreamer {
     /*! \class RTPTask
@@ -38,27 +39,30 @@ namespace gstreamer {
         ~RTPTask();
 
         /** Extract the GstStructure for the RTP Statistics*/
-        void extractPipelineStatus();
+        std::vector<RTPSessionStatistics> RTPStats(std::vector<GstElement*> sessions);
 
         /** Fetch the gbooleans and converts it to bool */
-        void fetchBoolean(const GstStructure &structure,
+        void fetchBoolean(const GstStructure& structure,
             const char* fieldname,
-            bool *boolean);
+            bool* boolean);
 
         /** Fetchs a unsigned int and converts it to int */
-        void fetchUnsignedInt(const GstStructure &structure,
+        template <typename T>
+        void fetchUnsignedInt(const GstStructure& structure,
             const char* fieldname,
-            int *number);
+            T* number);
 
         /** Fetchs a gstring and converts it to std::string */
-        void fetchString(const GstStructure &structure,
+        void fetchString(const GstStructure& structure,
             const char* fieldname,
-            std::string *str_var);
+            std::string* str_var);
 
         /** RTP bin element */
-        GstElement* m_rtpbin;
+        GstElement* m_bin;
+        /** RTP sessions element */
+        std::vector<GstElement*> m_rtp_internal_sessions;
         /** All rtp statistics */
-        RTPStreamStatistics m_rtp_statistics;
+        RTPSessionStatistics m_rtp_statistics;
 
         /**
          * Hook called when the state machine transitions from PreOperational to
