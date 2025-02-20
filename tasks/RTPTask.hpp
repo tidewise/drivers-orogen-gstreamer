@@ -1,8 +1,9 @@
 #ifndef RTPTASK_HPP
 #define RTPTASK_HPP
 
-#include "gstreamer/RTPTaskBase.hpp"
 #include "gst/rtp/rtp.h"
+#include "gstreamer/RTPTaskBase.hpp"
+#include <base/Float.hpp>
 
 namespace gstreamer {
     /*! \class RTPTask
@@ -41,28 +42,30 @@ namespace gstreamer {
         /** Extract the GstStructure for the RTP Statistics*/
         std::vector<RTPSessionStatistics> RTPStats(std::vector<GstElement*> sessions);
 
+        /** Extract the GstStructure for the RTP Sender Statistics */
+        RTPSenderStatistics RTPSenderStats(GstStructure const stats);
+
+        /** Extract the GstStructure for the RTP Receiver Statistics */
+        RTPReceiverStatistics RTPReceiverStats(GstStructure const stats);
+
         /** Fetch the gbooleans and converts it to bool */
-        void fetchBoolean(const GstStructure& structure,
-            const char* fieldname,
-            bool* boolean);
+        bool fetchBoolean(const GstStructure& structure, const char* fieldname);
 
         /** Fetchs a unsigned int and converts it to int */
-        template <typename T>
-        void fetchUnsignedInt(const GstStructure& structure,
-            const char* fieldname,
-            T* number);
+        uint64_t fetchUnsignedInt(const GstStructure& structure, const char* fieldname);
 
         /** Fetchs a gstring and converts it to std::string */
-        void fetchString(const GstStructure& structure,
-            const char* fieldname,
-            std::string* str_var);
+        std::string fetchString(const GstStructure& structure, const char* fieldname);
+
+        /** Fetchs a structure  */
+        std::vector<RTPPeerReceiverReport> fetchPeerReceiverReports(
+            const GstStructure& structure,
+            const char* fieldname);
 
         /** RTP bin element */
         GstElement* m_bin;
         /** RTP sessions element */
         std::vector<GstElement*> m_rtp_internal_sessions;
-        /** All rtp statistics */
-        RTPSessionStatistics m_rtp_statistics;
 
         /**
          * Hook called when the state machine transitions from PreOperational to
