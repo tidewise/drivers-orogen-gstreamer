@@ -36,8 +36,12 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
     session_stats.rtx_drop_count = fetchUnsignedInt(gst_stats, "rtx-drop-count");
     session_stats.sent_nack_count = fetchUnsignedInt(gst_stats, "sent-nack-count");
 
-    GValueArray* gst_source_stats = nullptr;
-    if (!gst_structure_get_array(gst_stats, "source-stats", &gst_source_stats)) {
+    const GValue* gst_source_stats_value =
+        gst_structure_get_value(gst_stats, "source-stats");
+    GValueArray* gst_source_stats =
+        static_cast<GValueArray*>(g_value_get_boxed(gst_source_stats_value));
+
+    if (!gst_stats) {
         LOG_ERROR_S << "source-stats does not seem to be an array";
         return session_stats;
     }
@@ -70,8 +74,8 @@ RTPSourceStatistics RTPTask::extractRTPSourceStats(const GstStructure* gst_stats
     stats.validated = fetchBoolean(gst_stats, "validated");
     stats.received_bye = fetchBoolean(gst_stats, "received-bye");
     stats.is_csrc = fetchBoolean(gst_stats, "is-csrc");
-    stats.seqnum_base = fetchUnsignedInt(gst_stats, "seqnum-base");
-    stats.clock_rate = fetchUnsignedInt(gst_stats, "clock-rate");
+    stats.seqnum_base = fetchInt(gst_stats, "seqnum-base");
+    stats.clock_rate = fetchInt(gst_stats, "clock-rate");
     return stats;
 }
 
@@ -93,13 +97,13 @@ RTPReceiverStatistics RTPTask::extractRTPReceiverStats(const GstStructure* stats
 RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
 {
     RTPSenderStatistics sender_statistics;
-    sender_statistics.payload_bytes_sent = fetchUnsignedInt(stats, "octets-sent");
-    sender_statistics.packets_sent = fetchUnsignedInt(stats, "packets-sent");
-    sender_statistics.payload_bytes_received = fetchUnsignedInt(stats, "octets-received");
-    sender_statistics.packets_received = fetchUnsignedInt(stats, "packets-received");
-    sender_statistics.bytes_received = fetchUnsignedInt(stats, "bytes-received");
-    sender_statistics.bitrate = fetchUnsignedInt(stats, "bitrate");
-    sender_statistics.packets_lost = fetchUnsignedInt(stats, "packets-lost");
+    sender_statistics.payload_bytes_sent = fetch64UnsignedInt(stats, "octets-sent");
+    sender_statistics.packets_sent = fetch64UnsignedInt(stats, "packets-sent");
+    sender_statistics.payload_bytes_received = fetch64UnsignedInt(stats, "octets-received");
+    sender_statistics.packets_received = fetch64UnsignedInt(stats, "packets-received");
+    sender_statistics.bytes_received = fetch64UnsignedInt(stats, "bytes-received");
+    sender_statistics.bitrate = fetch64UnsignedInt(stats, "bitrate");
+    sender_statistics.packets_lost = fetchInt(stats, "packets-lost");
     sender_statistics.jitter = fetchUnsignedInt(stats, "jitter");
     sender_statistics.sent_picture_loss_count = fetchUnsignedInt(stats, "sent-pli-count");
     sender_statistics.sent_full_image_request_count =
@@ -108,8 +112,8 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
         fetchUnsignedInt(stats, "recv-fir-count");
     sender_statistics.sent_nack_count = fetchUnsignedInt(stats, "sent-nack-count");
     sender_statistics.have_sr = fetchBoolean(stats, "have-sr");
-    sender_statistics.in_ntptime = base::Time::fromSeconds(
-        static_cast<double>(fetchUnsignedInt(stats, "in-ntptime")));
+    sender_statistics.sr_ntptime = base::Time::fromSeconds(
+        static_cast<double>(fetch64UnsignedInt(stats, "sr-ntptime")));
     sender_statistics.sr_rtptime = fetchUnsignedInt(stats, "sr-rtptime");
     sender_statistics.sr_octet_count = fetchUnsignedInt(stats, "sr-octet-count");
     sender_statistics.sr_packet_count = fetchUnsignedInt(stats, "sr-packet-count");
@@ -117,40 +121,7 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
     sender_statistics.sent_receiver_block_fractionlost =
         fetchUnsignedInt(stats, "sent-rb-fractionlost");
     sender_statistics.sent_receiver_block_packetslost =
-        fetchUnsignedInt(stats, "sent-rb-packets-lost");
-    sender_statistics.sent_receiver_block_exthighestseq =
-        fetchUnsignedInt(stats, "sent-rb-exthighestseq");
-    sender_statistics.sent_receiver_block_jitter =
-        fetchUnsignedInt(stats, "sent-rb-jitter");
-    sender_statistics.sent_receiver_block_lsr = base::Time::fromSeconds(
-        static_cast<double>(fetchUnsignedInt(stats, "sent-rb-lsr")));
-    sender_statistics.sent_receiver_block_dlsr = base::Time::fromSeconds(
-        static_cast<double>(fetchUnsignedInt(stats, "sent-rb-dlsr")));
-    sender_statistics.payload_bytes_sent = fetchUnsignedInt(stats, "octets-sent");
-    sender_statistics.packets_sent = fetchUnsignedInt(stats, "packets-sent");
-    sender_statistics.payload_bytes_received = fetchUnsignedInt(stats, "octets-received");
-    sender_statistics.packets_received = fetchUnsignedInt(stats, "packets-received");
-    sender_statistics.bytes_received = fetchUnsignedInt(stats, "bytes-received");
-    sender_statistics.bitrate = fetchUnsignedInt(stats, "bitrate");
-    sender_statistics.packets_lost = fetchUnsignedInt(stats, "packets-lost");
-    sender_statistics.jitter = fetchUnsignedInt(stats, "jitter");
-    sender_statistics.sent_picture_loss_count = fetchUnsignedInt(stats, "sent-pli-count");
-    sender_statistics.sent_full_image_request_count =
-        fetchUnsignedInt(stats, "sent-fir-count");
-    sender_statistics.received_full_image_request_count =
-        fetchUnsignedInt(stats, "recv-fir-count");
-    sender_statistics.sent_nack_count = fetchUnsignedInt(stats, "sent-nack-count");
-    sender_statistics.have_sr = fetchBoolean(stats, "have-sr");
-    sender_statistics.in_ntptime = base::Time::fromSeconds(
-        static_cast<double>(fetchUnsignedInt(stats, "in-ntptime")));
-    sender_statistics.sr_rtptime = fetchUnsignedInt(stats, "sr-rtptime");
-    sender_statistics.sr_octet_count = fetchUnsignedInt(stats, "sr-octet-count");
-    sender_statistics.sr_packet_count = fetchUnsignedInt(stats, "sr-packet-count");
-    sender_statistics.sent_receiver_block = fetchBoolean(stats, "sent-rb");
-    sender_statistics.sent_receiver_block_fractionlost =
-        fetchUnsignedInt(stats, "sent-rb-fractionlost");
-    sender_statistics.sent_receiver_block_packetslost =
-        fetchUnsignedInt(stats, "sent-rb-packets-lost");
+        fetchInt(stats, "sent-rb-packetslost");
     sender_statistics.sent_receiver_block_exthighestseq =
         fetchUnsignedInt(stats, "sent-rb-exthighestseq");
     sender_statistics.sent_receiver_block_jitter =
@@ -160,7 +131,7 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
     sender_statistics.sent_receiver_block_dlsr = base::Time::fromSeconds(
         static_cast<double>(fetchUnsignedInt(stats, "sent-rb-dlsr")));
     sender_statistics.peer_receiver_reports =
-        fetchPeerReceiverReports(stats, "receiver-rr");
+        extractPeerReceiverReports(stats);
 
     return sender_statistics;
 }
@@ -181,20 +152,40 @@ bool RTPTask::fetchBoolean(const GstStructure* structure, const char* fieldname)
     return false;
 }
 
-uint64_t RTPTask::fetchUnsignedInt(const GstStructure* structure, const char* fieldname)
+uint64_t RTPTask::fetch64UnsignedInt(const GstStructure* structure, const char* fieldname)
 {
     if (gst_structure_has_field(structure, fieldname) == FALSE) {
         LOG_INFO_S << "Field: \"" << fieldname << "\" not found";
         return 0;
     }
 
-    guint guint_value;
-    if (gst_structure_get_uint(structure, fieldname, &guint_value) != FALSE) {
-        return static_cast<uint64_t>(guint_value);
+    guint64 guint64_value;
+    gst_structure_get_uint64(structure, fieldname, &guint64_value);
+    return guint64_value;
+}
+
+uint32_t RTPTask::fetchUnsignedInt(const GstStructure* structure, const char* fieldname)
+{
+    if (gst_structure_has_field(structure, fieldname) == FALSE) {
+        LOG_INFO_S << "Field: \"" << fieldname << "\" not found";
+        return 0;
     }
 
-    LOG_INFO_S << "Invalid guint value for" << fieldname;
-    return 0;
+    guint guint32_value;
+    gst_structure_get_uint(structure, fieldname, &guint32_value);
+    return guint32_value;
+}
+
+uint32_t RTPTask::fetchInt(const GstStructure* structure, const char* fieldname)
+{
+    if (gst_structure_has_field(structure, fieldname) == FALSE) {
+        LOG_INFO_S << "Field: \"" << fieldname << "\" not found";
+        return 0;
+    }
+
+    gint gint_value;
+    gst_structure_get_int(structure, fieldname, &gint_value);
+    return gint_value;
 }
 
 std::string RTPTask::fetchString(const GstStructure* structure, const char* fieldname)
@@ -205,19 +196,13 @@ std::string RTPTask::fetchString(const GstStructure* structure, const char* fiel
     }
 
     const gchar* gstr_value = gst_structure_get_string(structure, fieldname);
-    if (gstr_value != nullptr) {
-        return std::string(gstr_value);
-    }
-    
-    LOG_INFO_S << "Invalid value for " << fieldname;
-    return std::string("");
+    return std::string(gstr_value);
 }
 
-std::vector<RTPPeerReceiverReport> RTPTask::fetchPeerReceiverReports(
-    const GstStructure* structure,
-    const char* fieldname)
+std::vector<RTPPeerReceiverReport> RTPTask::extractPeerReceiverReports(
+    const GstStructure* structure)
 {
-    const GValue* g_array_value = gst_structure_get_value(structure, fieldname);
+    const GValue* g_array_value = gst_structure_get_value(structure, "received-rr");
 
     if (!g_array_value) {
         LOG_INFO_S << "peer-receiver_reports are empty";
@@ -229,15 +214,19 @@ std::vector<RTPPeerReceiverReport> RTPTask::fetchPeerReceiverReports(
     for (size_t i = 0; i < array_size; i++) {
         const GValue* report_value = gst_value_array_get_value(g_array_value, i);
         if (!report_value) {
-            continue;
+            return all_reports;
         }
 
         const GstStructure* report_structure = gst_value_get_structure(report_value);
+        if (!report_structure) {
+            return all_reports;
+        }
+
         RTPPeerReceiverReport report;
         report.ssrc = fetchUnsignedInt(report_structure, "rb-ssrc");
         report.sender_ssrc = fetchUnsignedInt(report_structure, "rb-sender-ssrc");
         report.fractionlost = fetchUnsignedInt(report_structure, "rb-fractionlost");
-        report.packetslost = fetchUnsignedInt(report_structure, "rb-packetslost");
+        report.packetslost = fetchInt(report_structure, "rb-packetslost");
         report.exthighestseq = fetchUnsignedInt(report_structure, "rb-exthighestseq");
         report.jitter = fetchUnsignedInt(report_structure, "rb-jitter");
         report.lsr = base::Time::fromSeconds(

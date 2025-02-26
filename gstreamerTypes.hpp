@@ -198,7 +198,7 @@ namespace gstreamer {
         /** The source has sent SR */
         bool have_sr = false;
         /** NTP Time of the SR (in NTP Timestamp Format, 32.32 fixed point) */
-        base::Time in_ntptime;
+        base::Time sr_ntptime;
         /** RTP Time of SR (in clock rate units)*/
         uint64_t sr_rtptime = 0;
         /** The number of bytes in the SR */

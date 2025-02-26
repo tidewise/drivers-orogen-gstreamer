@@ -13,11 +13,16 @@ describe OroGen.gstreamer.RTPTask do
         rtp_sender = syskit_deploy_configure_and_start(rtp_sender_m(@rtp_port))
         rtp_receiver = syskit_deploy_configure_and_start(rtp_receiver_m(@rtp_port))
 
-        sample = expect_execution.to do
+        sender_sample = expect_execution.to do
             have_one_new_sample(rtp_sender.rtp_statistics_port)
         end
 
-        pp sample
+        receiver_sample = expect_execution.to do
+            have_one_new_sample(rtp_receiver.rtp_statistics_port)
+        end
+
+        pp sender_sample
+        pp receiver_sample
     end
 
     def rtp_sender_m(port)
