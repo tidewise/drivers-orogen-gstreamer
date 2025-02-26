@@ -63,3 +63,28 @@ Syskit.extend_model OroGen.gstreamer.Task do
         properties.outputs = outputs
     end
 end
+
+Syskit.extend_model OroGen.gstreamer.RTPTask do
+    argument :pipeline
+    argument :inputs, default: []
+    argument :outputs, default: []
+    argument :rtp_monitored_sessions, default: []
+
+    dynamic_service Services::ImageSink, as: "image_sink" do
+        provides Services::ImageSink, as: name, "image" => name
+    end
+
+    dynamic_service Services::ImageSource, as: "image_source" do
+        provides Services::ImageSource, as: name, "image" => name
+    end
+
+    def update_properties
+        super
+
+        properties.pipeline_initialization_timeout = Time.at(600)
+        properties.pipeline = pipeline
+        properties.inputs = inputs
+        properties.outputs = outputs
+        properties.rtp_monitored_sessions = rtp_monitored_sessions
+    end
+end

@@ -142,7 +142,34 @@ namespace gstreamer {
         base::Time round_trip;
     };
 
+    /** The RTP Session Statistics
+     *
+     * This is the response when the stats is present in the session
+     */
+    struct RTPSourceStatistics {
+        /** The label of the stream */
+        std::string name;
+
+        // The following fields are always present.
+        /** SSRC of this source */
+        uint16_t ssrc = 0;
+        /** Confirmation if the source is a source of the session */
+        bool internal = false;
+        /** Confirmation if source is validated*/
+        bool validated = false;
+        /** Confirmation if a bye has been received */
+        bool received_bye = false;
+        /** Confirmation if the source was found as CSRC */
+        bool is_csrc = false;
+        /** First seqnum if known */
+        uint32_t seqnum_base = 0;
+        /** Clock rate of the media */
+        uint32_t clock_rate = 0;
+    };
+
     struct RTPSenderStatistics {
+        RTPSourceStatistics source_stats;
+
         // The following fields make sense for internal sources and will only increase
         // when "is-sender" is TRUE.
         /** Number of payload bytes we sent */
@@ -212,6 +239,8 @@ namespace gstreamer {
     };
 
     struct RTPReceiverStatistics {
+        RTPSourceStatistics source_stats;
+
         // The following fields are only present when known.
         /** Origin of last received RTP Packet - Only present when known */
         std::string rtp_from = std::string("");
@@ -224,39 +253,18 @@ namespace gstreamer {
         uint64_t received_packet_rate = 0;
     };
 
-    /** The RTP Session Statistics
-     *
-     * This is the response when the stats is present in the session
-     */
     struct RTPSessionStatistics {
-        base::Time timestamp;
+        uint64_t rtx_drop_count = 0;
+        uint64_t sent_nack_count = 0;
+        uint64_t recv_nack_count = 0;
 
-        /** The label of the stream */
-        std::string name;
+        std::vector<RTPSenderStatistics> sender_stats;
+        std::vector<RTPReceiverStatistics> receiver_stats;
+    };
 
-        // The following fields are always present.
-        /** SSRC of this source */
-        uint16_t ssrc = 0;
-        /** Confirmation if the source is a source of the session */
-        bool internal = false;
-        /** Confirmation if source is validated*/
-        bool validated = false;
-        /** Confirmation if a bye has been received */
-        bool received_bye = false;
-        /** Confirmation if the source was found as CSRC */
-        bool is_csrc = false;
-        /** Confirmation if the source is a sender */
-        bool is_sender = false;
-        /** First seqnum if known */
-        uint32_t seqnum_base = 0;
-        /** Clock rate of the media */
-        uint32_t clock_rate = 0;
-
-        // These statistics are related to the received information.
-        RTPReceiverStatistics receiver;
-
-        // These statistics are only present when is-sender is true.
-        RTPSenderStatistics sender;
+    struct RTPStatistics {
+        base::Time time;
+        std::vector<RTPSessionStatistics> statistics;
     };
 }
 

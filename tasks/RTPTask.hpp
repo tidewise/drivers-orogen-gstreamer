@@ -40,28 +40,35 @@ namespace gstreamer {
         ~RTPTask();
 
         /** Extract the GstStructure for the RTP Statistics*/
-        std::vector<RTPSessionStatistics> RTPStats(std::vector<GstElement*> sessions);
+        RTPSessionStatistics extractRTPSessionStats(GstElement* session);
+
+        RTPSourceStatistics extractRTPSourceStats(GstStructure const* stats);
 
         /** Extract the GstStructure for the RTP Sender Statistics */
-        RTPSenderStatistics RTPSenderStats(GstStructure const stats);
+        RTPSenderStatistics extractRTPSenderStats(GstStructure const* stats);
 
         /** Extract the GstStructure for the RTP Receiver Statistics */
-        RTPReceiverStatistics RTPReceiverStats(GstStructure const stats);
+        RTPReceiverStatistics extractRTPReceiverStats(GstStructure const* stats);
 
         /** Fetch the gbooleans and converts it to bool */
-        bool fetchBoolean(const GstStructure& structure, const char* fieldname);
+        bool fetchBoolean(const GstStructure* structure, const char* fieldname);
 
         /** Fetchs a unsigned int and converts it to int */
-        uint64_t fetchUnsignedInt(const GstStructure& structure, const char* fieldname);
+        uint64_t fetchUnsignedInt(const GstStructure* structure, const char* fieldname);
 
         /** Fetchs a gstring and converts it to std::string */
-        std::string fetchString(const GstStructure& structure, const char* fieldname);
+        std::string fetchString(const GstStructure* structure, const char* fieldname);
 
         /** Fetchs a structure  */
         std::vector<RTPPeerReceiverReport> fetchPeerReceiverReports(
-            const GstStructure& structure,
+            const GstStructure* structure,
             const char* fieldname);
 
+        /** Converts a GValueArray to a GstStructure */
+        GstStructure* createSourceStatsStructure(GArray* source_stats);
+
+        /** RTP Monitored Settings */
+        RTPMonitoredSessions m_rtp_monitored_sessions;
         /** RTP bin element */
         GstElement* m_bin;
         /** RTP sessions element */

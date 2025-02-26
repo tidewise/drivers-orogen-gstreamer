@@ -68,9 +68,9 @@ task_context "RTPTask", subclasses: "Task" do
     # The RTP Session and name
     property "rtp_monitored_sessions", "/gstreamer/RTPMonitoredSessions"
     # Statistics output port
-    output_port "rtp_statistics", "/std/vector</gstreamer/RTPSessionStatistics>"
+    output_port "rtp_statistics", "/gstreamer/RTPStatistics"
 
-    port_driven
+    port_driven timeout: 0.1
 end
 
 # Common support for WebRTC
