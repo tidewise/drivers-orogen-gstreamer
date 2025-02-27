@@ -42,24 +42,23 @@ describe OroGen.gstreamer.RTPTask do
               .with_arguments(rtp_monitored_sessions:
                   { rtpbin_name: "rtptransmit", sessions: [{ session_id: 0 }] })
               .deployed_as("rtptransmit")
-            #   .deployed_as_unmanaged("rtptransmit")
     end
 
     def rtp_receiver_m(port)
         OroGen.gstreamer.RTPTask
               .with_arguments(
                   pipeline: <<~PIPELINE
-                      rtpbin name=receive
+                      rtpbin name=rtpreceive
                       udpsrc port=#{port}
                              caps="application/x-rtp,media=(string)video,clock-rate=(int)90000,
                              encoding-name=(string)H264,payload=(int)96"
-                          ! receive.recv_rtp_sink_0
-                      receive.recv_rtp_src_0_0_96
+                          ! rtpreceive.recv_rtp_sink_0
+                      rtpreceive.recv_rtp_src_0_0_96
                           ! filesink location=/dev/null
                   PIPELINE
               )
               .with_arguments(rtp_monitored_sessions:
-                  { rtpbin_name: "receive", sessions: [{ session_id: 0 }] })
+                  { rtpbin_name: "rtpreceive", sessions: [{ session_id: 0 }] })
               .deployed_as("rtpreceive")
     end
 

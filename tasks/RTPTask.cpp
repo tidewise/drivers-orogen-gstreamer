@@ -99,7 +99,8 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
     RTPSenderStatistics sender_statistics;
     sender_statistics.payload_bytes_sent = fetch64UnsignedInt(stats, "octets-sent");
     sender_statistics.packets_sent = fetch64UnsignedInt(stats, "packets-sent");
-    sender_statistics.payload_bytes_received = fetch64UnsignedInt(stats, "octets-received");
+    sender_statistics.payload_bytes_received =
+        fetch64UnsignedInt(stats, "octets-received");
     sender_statistics.packets_received = fetch64UnsignedInt(stats, "packets-received");
     sender_statistics.bytes_received = fetch64UnsignedInt(stats, "bytes-received");
     sender_statistics.bitrate = fetch64UnsignedInt(stats, "bitrate");
@@ -112,8 +113,8 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
         fetchUnsignedInt(stats, "recv-fir-count");
     sender_statistics.sent_nack_count = fetchUnsignedInt(stats, "sent-nack-count");
     sender_statistics.have_sr = fetchBoolean(stats, "have-sr");
-    sender_statistics.sr_ntptime = base::Time::fromSeconds(
-        static_cast<double>(fetch64UnsignedInt(stats, "sr-ntptime")));
+    sender_statistics.sr_ntptime = base::Time::fromMicroseconds(
+        ntp_to_unix_microseconds(fetch64UnsignedInt(stats, "sr-ntptime")));
     sender_statistics.sr_rtptime = fetchUnsignedInt(stats, "sr-rtptime");
     sender_statistics.sr_octet_count = fetchUnsignedInt(stats, "sr-octet-count");
     sender_statistics.sr_packet_count = fetchUnsignedInt(stats, "sr-packet-count");
@@ -130,8 +131,7 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
         static_cast<double>(fetchUnsignedInt(stats, "sent-rb-lsr")));
     sender_statistics.sent_receiver_block_dlsr = base::Time::fromSeconds(
         static_cast<double>(fetchUnsignedInt(stats, "sent-rb-dlsr")));
-    sender_statistics.peer_receiver_reports =
-        extractPeerReceiverReports(stats);
+    sender_statistics.peer_receiver_reports = extractPeerReceiverReports(stats);
 
     return sender_statistics;
 }
@@ -197,6 +197,24 @@ std::string RTPTask::fetchString(const GstStructure* structure, const char* fiel
 
     const gchar* gstr_value = gst_structure_get_string(structure, fieldname);
     return std::string(gstr_value);
+}
+
+int64_t RTPTask::ntp_to_unix_microseconds(uint64_t ntp_timestamp)
+{
+    // Extract seconds (upper 32 bits)
+    uint32_t ntp_seconds = ntp_timestamp >> 32;
+
+    // Extract fractional part (lower 32 bits)
+    uint32_t ntp_fraction = ntp_timestamp & 0xFFFFFFFF;
+
+    // Convert to UNIX time in seconds (1900 to 1970)
+    uint32_t unix_seconds = ntp_seconds - 2208988800;
+
+    // Convert fractional part to microseconds
+    uint64_t microseconds = (static_cast<uint64_t>(ntp_fraction) * 1000000ULL) >> 32;
+
+    // Combine seconds and microseconds
+    return (static_cast<int64_t>(unix_seconds) * 1000000ULL) + microseconds;
 }
 
 std::vector<RTPPeerReceiverReport> RTPTask::extractPeerReceiverReports(

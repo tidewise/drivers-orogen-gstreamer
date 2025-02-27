@@ -64,6 +64,9 @@ namespace gstreamer {
         /** Fetchs a gstring and converts it to std::string */
         std::string fetchString(const GstStructure* structure, const char* fieldname);
 
+        /** NTP to Unix in Microseconds */
+        int64_t ntp_to_unix_microseconds(uint64_t ntp_timestamp);
+
         /** Extracts a array of receiver reports contained on a GST_TYPE_LIST of
          * GstStructures on the "received-rr" field of a RTPSource*/
         std::vector<RTPPeerReceiverReport> extractPeerReceiverReports(
@@ -78,112 +81,6 @@ namespace gstreamer {
         GstElement* m_bin;
         /** RTP sessions element */
         std::vector<GstElement*> m_rtp_internal_sessions;
-
-        /**
-         * RTPReceiverReport:
-         *
-         * A receiver report structure.
-         */
-        struct RTPReceiverReport {
-            gboolean is_valid;
-            guint32 ssrc; /* which source is the report about */
-            guint8 fractionlost;
-            guint32 packetslost;
-            guint32 exthighestseq;
-            guint32 jitter;
-            guint32 lsr;
-            guint32 dlsr;
-            guint32 round_trip;
-        };
-
-        /**
-         * RTPSenderReport:
-         *
-         * A sender report structure.
-         */
-        struct RTPSenderReport {
-            gboolean is_valid;
-            guint64 ntptime;
-            guint32 rtptime;
-            guint32 packet_count;
-            guint32 octet_count;
-            GstClockTime time;
-        };
-
-        /**
-         * RTPSourceStats:
-         * @packets_received: number of received packets in total
-         * @prev_received: number of packets received in previous reporting
-         *                       interval
-         * @octets_received: number of payload bytes received
-         * @bytes_received: number of total bytes received including headers and lower
-         *                 protocol level overhead
-         * @max_seqnr: highest sequence number received
-         * @transit: previous transit time used for calculating @jitter
-         * @jitter: current jitter (in clock rate units scaled by 16 for precision)
-         * @prev_rtptime: previous time when an RTP packet was received
-         * @prev_rtcptime: previous time when an RTCP packet was received
-         * @last_rtptime: time when last RTP packet received
-         * @last_rtcptime: time when last RTCP packet received
-         * @curr_rr: index of current @rr block
-         * @rr: previous and current receiver report block
-         * @curr_sr: index of current @sr block
-         * @sr: previous and current sender report block
-         *
-         * Stats about a source.
-         */
-        struct RTPSourcesStats {
-            GstStructure* s;
-            gboolean is_sender;
-            gboolean internal;
-            gchar* address_str;
-            gboolean have_rb;
-            // Test value, change to 0 afterwards
-            guint32 ssrc = 89437;
-            guint8 fractionlost = 0;
-            gint32 packetslost = 0;
-            guint32 exthighestseq = 0;
-            guint32 jitter = 0;
-            guint32 lsr = 0;
-            guint32 dlsr = 0;
-            guint32 round_trip = 0;
-            gboolean have_sr;
-            GstClockTime time = 0;
-            guint64 ntptime = 0;
-            guint32 rtptime = 0;
-            guint32 packet_count = 0;
-            guint32 octet_count = 0;
-            guint64 packets_received;
-            guint64 octets_received;
-            guint64 bytes_received;
-            guint32 prev_expected;
-            guint32 prev_received;
-            guint16 max_seq;
-            guint64 cycles;
-            guint32 base_seq;
-            guint32 bad_seq;
-            guint32 transit;
-            guint64 packets_sent;
-            guint64 octets_sent;
-            guint sent_pli_count;
-            guint recv_pli_count;
-            guint sent_fir_count;
-            guint recv_fir_count;
-            guint sent_nack_count;
-            guint recv_nack_count;
-
-            /* when we received stuff */
-            GstClockTime prev_rtptime;
-            GstClockTime prev_rtcptime;
-            GstClockTime last_rtptime;
-            GstClockTime last_rtcptime;
-
-            /* sender and receiver reports */
-            gint curr_rr;
-            RTPReceiverReport rr[2];
-            gint curr_sr;
-            RTPSenderReport sr[2];
-        };
 
         /**
          * Hook called when the state machine transitions from PreOperational to
