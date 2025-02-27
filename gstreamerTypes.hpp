@@ -153,14 +153,26 @@ namespace gstreamer {
         // The following fields are always present.
         /** SSRC of this source */
         uint16_t ssrc = 0;
-        /** Confirmation if the source is a source of the session */
-        bool internal = false;
-        /** Confirmation if source is validated*/
-        bool validated = false;
-        /** Confirmation if a bye has been received */
-        bool received_bye = false;
-        /** Confirmation if the source was found as CSRC */
-        bool is_csrc = false;
+
+        enum Flags {
+            SOURCE_IS_FROM_SELF = 0x1,
+            SOURCE_IS_VALIDATED = 0x2,
+            BYE_RECEIVED = 0x4,
+            SOURCE_IS_CSRC = 0x8
+        };
+
+        /** @meta bitfield /gstreamer/RTPSourceStatistics/Flags */
+        uint8_t flags = 0;
+
+        /** Updates flags according to the parameters below */
+        void updateFlags(bool from_self, bool validated, bool bye_received, bool is_CSRC);
+
+        /** Returns a string corresponding to the flags */
+        std::string flagsToString();
+
+        /** RTP Bitfield as string */
+        std::string confirmations = "";
+
         /** First seqnum if known */
         uint32_t seqnum_base = 0;
         /** Clock rate of the media */

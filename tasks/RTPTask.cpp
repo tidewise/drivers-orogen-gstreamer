@@ -70,13 +70,55 @@ RTPSourceStatistics RTPTask::extractRTPSourceStats(const GstStructure* gst_stats
 {
     RTPSourceStatistics stats;
     stats.ssrc = fetchUnsignedInt(gst_stats, "ssrc");
-    stats.internal = fetchBoolean(gst_stats, "internal");
-    stats.validated = fetchBoolean(gst_stats, "validated");
-    stats.received_bye = fetchBoolean(gst_stats, "received-bye");
-    stats.is_csrc = fetchBoolean(gst_stats, "is-csrc");
+    stats.updateFlags(fetchBoolean(gst_stats, "internal"),
+        fetchBoolean(gst_stats, "validated"),
+        fetchBoolean(gst_stats, "received-bye"),
+        fetchBoolean(gst_stats, "is-csrc"));
+    stats.confirmations = stats.flagsToString();
     stats.seqnum_base = fetchInt(gst_stats, "seqnum-base");
     stats.clock_rate = fetchInt(gst_stats, "clock-rate");
     return stats;
+}
+
+void RTPSourceStatistics::updateFlags(bool from_self,
+    bool validated,
+    bool bye_received,
+    bool is_CSRC)
+{
+    flags = 0; // Reset flags
+
+    if (from_self)
+        flags |= SOURCE_IS_FROM_SELF;
+    if (validated)
+        flags |= SOURCE_IS_VALIDATED;
+    if (bye_received)
+        flags |= BYE_RECEIVED;
+    if (is_CSRC)
+        flags |= SOURCE_IS_CSRC;
+}
+
+std::string RTPSourceStatistics::flagsToString()
+{
+    std::string result;
+
+    if (flags & SOURCE_IS_FROM_SELF)
+        result += "SOURCE_IS_FROM_SELF | ";
+    if (flags & SOURCE_IS_VALIDATED)
+        result += "SOURCE_IS_VALIDATED | ";
+    if (flags & BYE_RECEIVED)
+        result += "BYE_RECEIVED | ";
+    if (flags & SOURCE_IS_CSRC)
+        result += "SOURCE_IS_CSRC | ";
+
+    // Remove " | " from last flag
+    if (!result.empty()) {
+        result.erase(result.length() - 3);
+    }
+    else {
+        result = "NONE";
+    }
+
+    return result;
 }
 
 RTPReceiverStatistics RTPTask::extractRTPReceiverStats(const GstStructure* stats)
