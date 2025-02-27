@@ -164,10 +164,7 @@ namespace gstreamer {
         /** @meta bitfield /gstreamer/RTPSourceStatistics/Flags */
         uint8_t flags = 0;
 
-        /** Updates flags according to the parameters below */
-        void updateFlags(bool from_self, bool validated, bool bye_received, bool is_CSRC);
-
-        /** Returns a string corresponding to the flags */
+        /** Returns a string corresponding to the flags present on RTPTask.cpp*/
         std::string flagsToString();
 
         /** RTP Bitfield as string */

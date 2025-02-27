@@ -64,6 +64,9 @@ namespace gstreamer {
         /** Fetchs a gstring and converts it to std::string */
         std::string fetchString(const GstStructure* structure, const char* fieldname);
 
+        /** Updates flags of a RTPSourceStatistics struct */
+        uint8_t fetchFlags(const GstStructure* gst_stats);
+
         /** NTP to Unix in Microseconds */
         int64_t ntp_to_unix_microseconds(uint64_t ntp_timestamp);
 
