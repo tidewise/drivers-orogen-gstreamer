@@ -31,6 +31,7 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
     GstStructure* gst_stats = nullptr;
     g_object_get(session, "stats", &gst_stats, NULL);
 
+
     session_stats.recv_nack_count = fetchUnsignedInt(gst_stats, "recv-nack-count");
     session_stats.rtx_drop_count = fetchUnsignedInt(gst_stats, "rtx-drop-count");
     session_stats.sent_nack_count = fetchUnsignedInt(gst_stats, "sent-nack-count");
@@ -68,6 +69,7 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
 RTPSourceStatistics RTPTask::extractRTPSourceStats(const GstStructure* gst_stats)
 {
     RTPSourceStatistics stats;
+    stats.stream_name = m_rtp_monitored_sessions.rtpbin_name;
     stats.ssrc = fetchUnsignedInt(gst_stats, "ssrc");
     stats.flags = fetchFlags(gst_stats);
     stats.confirmations = stats.flagsToString();

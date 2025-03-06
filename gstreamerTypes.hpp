@@ -148,7 +148,7 @@ namespace gstreamer {
      */
     struct RTPSourceStatistics {
         /** The label of the stream */
-        std::string name;
+        std::string stream_name;
 
         // The following fields are always present.
         /** SSRC of this source */
