@@ -124,7 +124,7 @@ namespace gstreamer {
     struct RTPPeerReceiverReport {
         /** The SSRC of this source */
         uint16_t ssrc = 0;
-        /** The SSRC of the sender of this RR */
+        /** The SSRC of the sender of this Receiver Report */
         uint16_t sender_ssrc = 0;
         /** Lost 8-bit fraction */
         float fractionlost = 0;
@@ -134,11 +134,11 @@ namespace gstreamer {
         uint32_t exthighestseq = 0;
         /** Reception jitter (in clock rate units) */
         uint32_t jitter = 0;
-        /** Last SR time (seconds in NTP Short Format, 16.16 fixed point) */
+        /** Last Sender Report time */
         base::Time lsr;
-        /** Delay since last SR (seconds in NTP Short Format, 16.16 fixed point) */
+        /** Delay since last Sender Report */
         base::Time dlsr;
-        /** The round-trip time (seconds in NTP Short Format, 16.16 fixed point) */
+        /** The round-trip time */
         base::Time round_trip;
     };
 
@@ -164,10 +164,11 @@ namespace gstreamer {
         /** @meta bitfield /gstreamer/RTPSourceStatistics/Flags */
         uint8_t flags = 0;
 
-        /** Returns a string corresponding to the flags present on RTPTask.cpp*/
+        /** Returns a string corresponding to the \see flags.
+         * The method is located inside RTPTask.cpp */
         std::string flagsToString();
 
-        /** RTP Bitfield as string */
+        /** RTP Bitfield from the received GstStructure confirmations as a string */
         std::string confirmations = "";
 
         /** First seqnum if known */
@@ -179,8 +180,7 @@ namespace gstreamer {
     struct RTPSenderStatistics {
         RTPSourceStatistics source_stats;
 
-        // The following fields make sense for internal sources and will only increase
-        // when "is-sender" is TRUE.
+        // The following fields make sense for internal sources
         /** Number of payload bytes we sent */
         uint64_t payload_bytes_sent = 0;
         /** Number of packets we sent */
@@ -203,22 +203,23 @@ namespace gstreamer {
         /** Estimated Jitter (in clock rate units) */
         uint32_t jitter = 0;
 
-        // The last SR report this source sent. Only updates when "is-sender" is TRUE.
-        /** The source has sent SR */
+        // The last Sender Report report this source sent. Only updates when "is-sender"
+        // is TRUE.
+        /** The source has sent Sender Report */
         bool have_sr = false;
-        /** NTP Time of the SR (in NTP Timestamp Format, 32.32 fixed point) */
+        /** NTP Time of the Sender Report */
         base::Time sr_ntptime;
-        /** RTP Time of SR (in clock rate units)*/
+        /** RTP Time of Sender Report (in clock rate units)*/
         uint64_t sr_rtptime = 0;
-        /** The number of bytes in the SR */
+        /** The number of bytes in the Sender Report */
         uint32_t sr_octet_count = 0;
-        /** The number of packets in the SR */
+        /** The number of packets in the Sender Report */
         uint32_t sr_packet_count = 0;
 
         // The following fields are only present for non-internal sources and represent
-        // the content of the last RB packet that was sent to this source. These values
+        // the content of the last RTB Buffer packet that was sent to this source. These values
         // are only updated when the source is sending.
-        /** Confirmation if a RB has been sent */
+        /** Confirmation if a RTB Buffer has been sent */
         bool sent_receiver_block = false;
         /** Lost Packets */
         uint16_t sent_receiver_block_packetslost = 0;
@@ -228,9 +229,9 @@ namespace gstreamer {
         uint32_t sent_receiver_block_exthighestseq = 0;
         /** Jitter in clock rate units */
         uint32_t sent_receiver_block_jitter = 0;
-        /** Last SR time (seconds in NTP Short Format, 16.16 fixed point) */
+        /** Last Sender Report time */
         base::Time sent_receiver_block_lsr;
-        /** delay since last SR (seconds in NTP Short Format, 16.16 fixed point) */
+        /** delay since last Sender Report */
         base::Time sent_receiver_block_dlsr;
 
         // Documentation not available

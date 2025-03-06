@@ -20,9 +20,6 @@ describe OroGen.gstreamer.RTPTask do
         receiver_sample = expect_execution.to do
             have_one_new_sample(rtp_receiver.rtp_statistics_port)
         end
-
-        pp sender_sample
-        pp receiver_sample
     end
 
     def rtp_sender_m(port)

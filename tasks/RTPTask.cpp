@@ -61,6 +61,7 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
         }
     }
 
+    gst_structure_free(gst_stats);
     return session_stats;
 }
 
@@ -303,11 +304,7 @@ bool RTPTask::startHook()
     if (!RTPTaskBase::startHook())
         return false;
 
-    // this should be inside the configure hook, but i don't know if it will work..
-    // m_pipeline is not a bin there. But i'm not sure it is here either, after all
-    // the problem was a timeout the task was also stopped on wetpaint.
-
-    for (auto monitored_session : m_rtp_monitored_sessions.sessions) {
+    for (auto const& monitored_session : m_rtp_monitored_sessions.sessions) {
         GstElement* session = nullptr;
         g_signal_emit_by_name(m_bin,
             "get-internal-session",
