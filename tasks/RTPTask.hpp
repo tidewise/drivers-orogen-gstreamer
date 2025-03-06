@@ -39,15 +39,16 @@ namespace gstreamer {
 
         ~RTPTask();
 
-        /** Extract the GstStructure for the RTP Statistics*/
+        /** Extract the Stats for the RTPSession*/
         RTPSessionStatistics extractRTPSessionStats(GstElement* session);
 
-        RTPSourceStatistics extractRTPSourceStats(GstStructure const* stats);
+        /** Extract the Source-Stats from a Stats GstStructure from RTPSession */
+        RTPSourceStatistics extractRTPSourceStats(GstStructure const* stat);
 
-        /** Extract the GstStructure for the RTP Sender Statistics */
+        /** Extract the Stats from a RTP Sender */
         RTPSenderStatistics extractRTPSenderStats(GstStructure const* stats);
 
-        /** Extract the GstStructure for the RTP Receiver Statistics */
+        /** Extract the Stats from a RTP Receiver */
         RTPReceiverStatistics extractRTPReceiverStats(GstStructure const* stats);
 
         /** Fetch the gbooleans and converts it to bool */

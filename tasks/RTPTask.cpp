@@ -30,7 +30,6 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
 
     GstStructure* gst_stats = nullptr;
     g_object_get(session, "stats", &gst_stats, NULL);
-    LOG_INFO_S << "stats: " << gst_structure_to_string(gst_stats);
 
     session_stats.recv_nack_count = fetchUnsignedInt(gst_stats, "recv-nack-count");
     session_stats.rtx_drop_count = fetchUnsignedInt(gst_stats, "rtx-drop-count");
@@ -42,8 +41,7 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
         static_cast<GValueArray*>(g_value_get_boxed(gst_source_stats_value));
 
     if (!gst_stats) {
-        LOG_ERROR_S << "source-stats does not seem to be an array";
-        return session_stats;
+        throw std::runtime_error("gst-source-stats is not a boxed type");
     }
 
     for (guint i = 0; i < gst_source_stats->n_values; i++) {
@@ -176,64 +174,51 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
 
 bool RTPTask::fetchBoolean(const GstStructure* structure, const char* fieldname)
 {
-    if (gst_structure_has_field(structure, fieldname) == FALSE) {
-        LOG_INFO_S << "Field: \"" << fieldname << "\" not found";
+    gboolean gboolean_value;
+    if (!gst_structure_get_boolean(structure, fieldname, &gboolean_value)) {
         return false;
     }
 
-    gboolean gboolean_value;
-    gst_structure_get_boolean(structure, fieldname, &gboolean_value);
-    if (gboolean_value == TRUE) {
-        return true;
-    }
-
-    return false;
+    return gboolean_value;
 }
 
 uint64_t RTPTask::fetch64UnsignedInt(const GstStructure* structure, const char* fieldname)
 {
-    if (gst_structure_has_field(structure, fieldname) == FALSE) {
-        LOG_INFO_S << "Field: \"" << fieldname << "\" not found";
+    guint64 guint64_value;
+    if (!gst_structure_get_uint64(structure, fieldname, &guint64_value)) {
         return 0;
     }
 
-    guint64 guint64_value;
-    gst_structure_get_uint64(structure, fieldname, &guint64_value);
     return guint64_value;
 }
 
 uint32_t RTPTask::fetchUnsignedInt(const GstStructure* structure, const char* fieldname)
 {
-    if (gst_structure_has_field(structure, fieldname) == FALSE) {
-        LOG_INFO_S << "Field: \"" << fieldname << "\" not found";
+    guint guint32_value;
+    if (!gst_structure_get_uint(structure, fieldname, &guint32_value)) {
         return 0;
     }
 
-    guint guint32_value;
-    gst_structure_get_uint(structure, fieldname, &guint32_value);
     return guint32_value;
 }
 
 uint32_t RTPTask::fetchInt(const GstStructure* structure, const char* fieldname)
 {
-    if (gst_structure_has_field(structure, fieldname) == FALSE) {
-        LOG_INFO_S << "Field: \"" << fieldname << "\" not found";
+    gint gint_value;
+    if (!gst_structure_get_int(structure, fieldname, &gint_value)) {
         return 0;
     }
 
-    gint gint_value;
-    gst_structure_get_int(structure, fieldname, &gint_value);
     return gint_value;
 }
 
 std::string RTPTask::fetchString(const GstStructure* structure, const char* fieldname)
 {
-    if (gst_structure_has_field(structure, fieldname) == FALSE) {
-        LOG_INFO_S << "Field: \"" << fieldname << "\" not found";
+    const gchar* gstr_value = gst_structure_get_string(structure, fieldname);
+    if (gstr_value == nullptr) {
         return std::string("");
     }
 
-    const gchar* gstr_value = gst_structure_get_string(structure, fieldname);
     return std::string(gstr_value);
 }
 
