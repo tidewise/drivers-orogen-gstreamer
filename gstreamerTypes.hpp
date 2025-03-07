@@ -135,11 +135,11 @@ namespace gstreamer {
         /** Reception jitter (in clock rate units) */
         uint32_t jitter = 0;
         /** Last Sender Report time */
-        base::Time lsr;
+        double lsr;
         /** Delay since last Sender Report */
-        base::Time dlsr;
+        double dlsr;
         /** The round-trip time */
-        base::Time round_trip;
+        double round_trip;
     };
 
     /** The RTP Session Statistics
@@ -210,15 +210,15 @@ namespace gstreamer {
         /** NTP Time of the Sender Report */
         base::Time sr_ntptime;
         /** RTP Time of Sender Report (in clock rate units)*/
-        uint64_t sr_rtptime = 0;
+        uint32_t sr_rtptime = 0;
         /** The number of bytes in the Sender Report */
         uint32_t sr_octet_count = 0;
         /** The number of packets in the Sender Report */
         uint32_t sr_packet_count = 0;
 
         // The following fields are only present for non-internal sources and represent
-        // the content of the last RTB Buffer packet that was sent to this source. These values
-        // are only updated when the source is sending.
+        // the content of the last RTB Buffer packet that was sent to this source. These
+        // values are only updated when the source is sending.
         /** Confirmation if a RTB Buffer has been sent */
         bool sent_receiver_block = false;
         /** Lost Packets */
@@ -229,10 +229,10 @@ namespace gstreamer {
         uint32_t sent_receiver_block_exthighestseq = 0;
         /** Jitter in clock rate units */
         uint32_t sent_receiver_block_jitter = 0;
-        /** Last Sender Report time */
-        base::Time sent_receiver_block_lsr;
-        /** delay since last Sender Report */
-        base::Time sent_receiver_block_dlsr;
+        /** Last Sender Report time in seconds */
+        double sent_receiver_block_lsr;
+        /** delay since last Sender Report in seconds */
+        double sent_receiver_block_dlsr;
 
         // Documentation not available
         uint32_t sent_picture_loss_count = 0;
@@ -267,6 +267,8 @@ namespace gstreamer {
         uint64_t rtx_drop_count = 0;
         uint64_t sent_nack_count = 0;
         uint64_t recv_nack_count = 0;
+        uint64_t sent_rtx_req_count = 0;
+        uint64_t recv_rtx_req_count = 0;
 
         std::vector<RTPSenderStatistics> sender_stats;
         std::vector<RTPReceiverStatistics> receiver_stats;

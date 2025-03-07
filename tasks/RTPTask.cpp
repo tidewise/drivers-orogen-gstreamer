@@ -35,6 +35,8 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
     session_stats.recv_nack_count = fetchUnsignedInt(gst_stats, "recv-nack-count");
     session_stats.rtx_drop_count = fetchUnsignedInt(gst_stats, "rtx-drop-count");
     session_stats.sent_nack_count = fetchUnsignedInt(gst_stats, "sent-nack-count");
+    session_stats.recv_rtx_req_count = fetchUnsignedInt(gst_stats, "recv-rtx-req-count");
+    session_stats.sent_rtx_req_count = fetchUnsignedInt(gst_stats, "sent-rtx-req-count");
 
     const GValue* gst_source_stats_value =
         gst_structure_get_value(gst_stats, "source-stats");
@@ -153,7 +155,7 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
     sender_statistics.sent_nack_count = fetchUnsignedInt(stats, "sent-nack-count");
     sender_statistics.have_sr = fetchBoolean(stats, "have-sr");
     sender_statistics.sr_ntptime = base::Time::fromMicroseconds(
-        ntp_to_unix_microseconds(fetch64UnsignedInt(stats, "sr-ntptime")));
+        ntpToUnixMicroseconds(fetch64UnsignedInt(stats, "sr-ntptime")));
     sender_statistics.sr_rtptime = fetchUnsignedInt(stats, "sr-rtptime");
     sender_statistics.sr_octet_count = fetchUnsignedInt(stats, "sr-octet-count");
     sender_statistics.sr_packet_count = fetchUnsignedInt(stats, "sr-packet-count");
@@ -166,10 +168,8 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
         fetchUnsignedInt(stats, "sent-rb-exthighestseq");
     sender_statistics.sent_receiver_block_jitter =
         fetchUnsignedInt(stats, "sent-rb-jitter");
-    sender_statistics.sent_receiver_block_lsr = base::Time::fromSeconds(
-        static_cast<double>(fetchUnsignedInt(stats, "sent-rb-lsr")));
-    sender_statistics.sent_receiver_block_dlsr = base::Time::fromSeconds(
-        static_cast<double>(fetchUnsignedInt(stats, "sent-rb-dlsr")));
+    sender_statistics.sent_receiver_block_lsr = ntpShortToSeconds(fetchUnsignedInt(stats, "sent-rb-lsr"));
+    sender_statistics.sent_receiver_block_dlsr = ntpShortToSeconds(fetchUnsignedInt(stats, "sent-rb-dlsr"));
     sender_statistics.peer_receiver_reports = extractPeerReceiverReports(stats);
 
     return sender_statistics;
@@ -225,7 +225,7 @@ std::string RTPTask::fetchString(const GstStructure* structure, const char* fiel
     return std::string(gstr_value);
 }
 
-int64_t RTPTask::ntp_to_unix_microseconds(uint64_t ntp_timestamp)
+int64_t RTPTask::ntpToUnixMicroseconds(uint64_t ntp_timestamp)
 {
     // Extract seconds (upper 32 bits)
     uint32_t ntp_seconds = ntp_timestamp >> 32;
@@ -241,6 +241,12 @@ int64_t RTPTask::ntp_to_unix_microseconds(uint64_t ntp_timestamp)
 
     // Combine seconds and microseconds
     return (static_cast<int64_t>(unix_seconds) * 1000000ULL) + microseconds;
+}
+
+// Only gets the seconds according to documentation
+double RTPTask::ntpShortToSeconds(uint32_t ntp_short) {
+    double seconds = ntp_short / 65536.0;
+    return seconds;
 }
 
 std::vector<RTPPeerReceiverReport> RTPTask::extractPeerReceiverReports(
@@ -273,12 +279,9 @@ std::vector<RTPPeerReceiverReport> RTPTask::extractPeerReceiverReports(
         report.packetslost = fetchInt(report_structure, "rb-packetslost");
         report.exthighestseq = fetchUnsignedInt(report_structure, "rb-exthighestseq");
         report.jitter = fetchUnsignedInt(report_structure, "rb-jitter");
-        report.lsr = base::Time::fromSeconds(
-            static_cast<double>(fetchUnsignedInt(report_structure, "rb-lsr")));
-        report.dlsr = base::Time::fromSeconds(
-            static_cast<double>(fetchUnsignedInt(report_structure, "rb-dlsr")));
-        report.round_trip = base::Time::fromSeconds(
-            static_cast<double>(fetchUnsignedInt(report_structure, "rb-round-trip")));
+        report.lsr = ntpShortToSeconds(fetchUnsignedInt(report_structure, "rb-lsr"));
+        report.dlsr = ntpShortToSeconds(fetchUnsignedInt(report_structure, "rb-dlsr"));
+        report.round_trip = ntpShortToSeconds(fetchUnsignedInt(report_structure, "rb-round-trip"));
         all_reports.push_back(report);
     }
 

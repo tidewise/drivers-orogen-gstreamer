@@ -69,7 +69,10 @@ namespace gstreamer {
         uint8_t fetchFlags(const GstStructure* gst_stats);
 
         /** NTP to Unix in Microseconds */
-        int64_t ntp_to_unix_microseconds(uint64_t ntp_timestamp);
+        int64_t ntpToUnixMicroseconds(uint64_t ntp_timestamp);
+
+        /** NTP Short to Seconds */
+        double ntpShortToSeconds(uint32_t ntp_short);
 
         /** Extracts a array of receiver reports contained on a GST_TYPE_LIST of
          * GstStructures on the "received-rr" field of a RTPSource*/
