@@ -3,6 +3,8 @@ templates/*
 *~
 .*.swp
 build/
+bundle/
+orocos.log
 
 *autobuild-stamp
 

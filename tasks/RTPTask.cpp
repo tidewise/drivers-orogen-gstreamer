@@ -146,11 +146,10 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
     sender_statistics.bytes_received = fetch64UnsignedInt(stats, "bytes-received");
     sender_statistics.bitrate = fetch64UnsignedInt(stats, "bitrate");
     sender_statistics.packets_lost = fetchInt(stats, "packets-lost");
-    sender_statistics.jitter = fetchUnsignedInt(stats, "jitter");
-    // Only calculates jitter in ms if there's a valid clock rate and jitter is not 0
-    if (m_source_stats.clock_rate != 0 && sender_statistics.jitter != 0) {
-        sender_statistics.jitter *= 1000;
-        sender_statistics.jitter /= static_cast<double>(m_source_stats.clock_rate);
+    // Only calculates jitter in ms if there's a valid clock rate
+    if (m_source_stats.clock_rate != 0) {
+        sender_statistics.jitter =
+            jitterToMicroseconds(fetchUnsignedInt(stats, "jitter"));
     }
     sender_statistics.sent_picture_loss_count = fetchUnsignedInt(stats, "sent-pli-count");
     sender_statistics.sent_full_image_request_count =
@@ -160,8 +159,7 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
     sender_statistics.sent_nack_count = fetchUnsignedInt(stats, "sent-nack-count");
     sender_statistics.have_sr = fetchBoolean(stats, "have-sr");
     m_ntp_timestamp = fetch64UnsignedInt(stats, "sr-ntptime");
-    sender_statistics.sr_ntptime =
-        base::Time::fromMicroseconds(ntpToUnixMicroseconds(m_ntp_timestamp));
+    sender_statistics.sr_ntptime = ntpToUnixMicroseconds(m_ntp_timestamp);
     sender_statistics.sr_rtptime_in_clock_rate_units =
         fetchUnsignedInt(stats, "sr-rtptime");
     sender_statistics.sr_octet_count = fetchUnsignedInt(stats, "sr-octet-count");
@@ -173,20 +171,16 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
         fetchInt(stats, "sent-rb-packetslost");
     sender_statistics.sent_receiver_block_exthighestseq =
         fetchUnsignedInt(stats, "sent-rb-exthighestseq");
-    sender_statistics.sent_receiver_block_jitter =
-        fetchUnsignedInt(stats, "sent-rb-jitter");
-    // Only calculates jitter in ms if there's a valid clock rate and jitter is not 0
-    if (m_source_stats.clock_rate != 0 &&
-        sender_statistics.sent_receiver_block_jitter != 0) {
-        sender_statistics.sent_receiver_block_jitter *= 1000;
-        sender_statistics.sent_receiver_block_jitter /=
-            static_cast<double>(m_source_stats.clock_rate);
+    // Only calculates jitter in ms if there's a valid clock rate
+    if (m_source_stats.clock_rate != 0) {
+        sender_statistics.sent_receiver_block_jitter =
+            jitterToMicroseconds(fetchUnsignedInt(stats, "sent-rb-jitter"));
     }
     sender_statistics.sent_receiver_block_lsr =
-        base::Time::fromMicroseconds(ntpShortToUnixMicroseconds(m_ntp_timestamp,
-            fetchUnsignedInt(stats, "sent-rb-lsr")));
+        ntpShortToUnixMicroseconds(m_ntp_timestamp,
+            fetchUnsignedInt(stats, "sent-rb-lsr"));
     sender_statistics.sent_receiver_block_dlsr =
-        delayNTPShortToSeconds(fetchUnsignedInt(stats, "sent-rb-dlsr"));
+        delayNTPShortToMicroseconds(fetchUnsignedInt(stats, "sent-rb-dlsr"));
     sender_statistics.peer_receiver_reports = extractPeerReceiverReports(stats);
 
     return sender_statistics;
@@ -242,7 +236,7 @@ std::string RTPTask::fetchString(const GstStructure* structure, const char* fiel
     return std::string(gstr_value);
 }
 
-int64_t RTPTask::ntpToUnixMicroseconds(uint64_t ntp_timestamp)
+base::Time RTPTask::ntpToUnixMicroseconds(uint64_t ntp_timestamp)
 {
     // Extract seconds (upper 32 bits)
     uint32_t ntp_seconds = ntp_timestamp >> 32;
@@ -257,17 +251,18 @@ int64_t RTPTask::ntpToUnixMicroseconds(uint64_t ntp_timestamp)
     uint64_t microseconds = (static_cast<uint64_t>(ntp_fraction) * 1000000ULL) >> 32;
 
     // Combine seconds and microseconds
-    return (static_cast<int64_t>(unix_seconds) * 1000000ULL) + microseconds;
+    return base::Time::fromMicroseconds(
+        (static_cast<int64_t>(unix_seconds) * 1000000ULL) + microseconds);
 }
 
 // Only gets the seconds according to documentation
-double RTPTask::delayNTPShortToSeconds(uint32_t ntp_short)
+base::Time RTPTask::delayNTPShortToMicroseconds(uint32_t ntp_short)
 {
-    double seconds = ntp_short / 65536.0;
-    return seconds;
+    return base::Time::fromMicroseconds(
+        (static_cast<uint64_t>(ntp_short) * 1000000ULL) >> 16);
 }
 
-double RTPTask::ntpShortToUnixMicroseconds(uint64_t ntp_timestamp, uint32_t ntp_short)
+base::Time RTPTask::ntpShortToUnixMicroseconds(uint64_t ntp_timestamp, uint32_t ntp_short)
 {
     // Extract ntp_timestamp most significative bits
     uint16_t ntp_fixed_seconds = ntp_timestamp >> 48;
@@ -289,7 +284,14 @@ double RTPTask::ntpShortToUnixMicroseconds(uint64_t ntp_timestamp, uint32_t ntp_
     // Create complete ntp timestamp using extracted values
     uint64_t microseconds = (static_cast<uint64_t>(fractional) * 1000000ULL) >> 32;
 
-    return (static_cast<uint64_t>(unix_seconds) * 1000000ULL) + microseconds;
+    return base::Time::fromMicroseconds(
+        (static_cast<uint64_t>(unix_seconds) * 1000000ULL) + microseconds);
+}
+
+base::Time RTPTask::jitterToMicroseconds(uint32_t jitter)
+{
+    return base::Time::fromMicroseconds(
+        (static_cast<uint64_t>(jitter) * 1000000ULL) / m_source_stats.clock_rate);
 }
 
 std::vector<RTPPeerReceiverReport> RTPTask::extractPeerReceiverReports(
@@ -321,19 +323,17 @@ std::vector<RTPPeerReceiverReport> RTPTask::extractPeerReceiverReports(
         report.fractionlost = fetchUnsignedInt(report_structure, "rb-fractionlost");
         report.packetslost = fetchInt(report_structure, "rb-packetslost");
         report.exthighestseq = fetchUnsignedInt(report_structure, "rb-exthighestseq");
-        report.jitter = fetchUnsignedInt(report_structure, "rb-jitter");
-        // Only calculates jitter in ms if there's a valid clock rate and jitter is not 0
-        if (m_source_stats.clock_rate != 0 && report.jitter != 0) {
-            report.jitter *= 1000;
-            report.jitter /= static_cast<double>(m_source_stats.clock_rate);
+        // Only calculates jitter in ms if there's a valid clock rate
+        if (m_source_stats.clock_rate != 0) {
+            report.jitter =
+                jitterToMicroseconds(fetchUnsignedInt(report_structure, "rb-jitter"));
         }
-        report.lsr =
-            base::Time::fromMicroseconds(ntpShortToUnixMicroseconds(m_ntp_timestamp,
-                fetchUnsignedInt(report_structure, "rb-lsr")));
+        report.lsr = ntpShortToUnixMicroseconds(m_ntp_timestamp,
+            fetchUnsignedInt(report_structure, "rb-lsr"));
         report.dlsr =
-            delayNTPShortToSeconds(fetchUnsignedInt(report_structure, "rb-dlsr"));
-        report.round_trip =
-            delayNTPShortToSeconds(fetchUnsignedInt(report_structure, "rb-round-trip"));
+            delayNTPShortToMicroseconds(fetchUnsignedInt(report_structure, "rb-dlsr"));
+        report.round_trip = delayNTPShortToMicroseconds(
+            fetchUnsignedInt(report_structure, "rb-round-trip"));
         all_reports.push_back(report);
     }
 

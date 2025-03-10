@@ -132,14 +132,14 @@ namespace gstreamer {
         uint32_t packetslost = 0;
         /** Highest received seqnum */
         uint32_t exthighestseq = 0;
-        /** Reception jitter in ms if clock rate is present */
-        uint32_t jitter = 0;
+        /** Reception jitter if clock rate is present */
+        base::Time jitter;
         /** Last Sender Report time */
         base::Time lsr;
         /** Delay since last Sender Report */
-        double dlsr;
+        base::Time dlsr;
         /** The round-trip time */
-        double round_trip;
+        base::Time round_trip;
     };
 
     /** The RTP Session Statistics
@@ -200,8 +200,8 @@ namespace gstreamer {
         uint32_t bitrate = 0;
         /** Estimated amount of packets lost */
         uint32_t packets_lost = 0;
-        /** Estimated Jitter in ms if clock rate is available */
-        uint32_t jitter = 0;
+        /** Estimated Jitter if clock rate is available */
+        base::Time jitter;
 
         // The last Sender Report report this source sent. Only updates when "is-sender"
         // is TRUE.
@@ -227,12 +227,12 @@ namespace gstreamer {
         float sent_receiver_block_fractionlost = 0;
         /** Last seen seqnum */
         uint32_t sent_receiver_block_exthighestseq = 0;
-        /** Jitter in ms if clock rate is available*/
-        uint32_t sent_receiver_block_jitter = 0;
-        /** Last Sender Report time in seconds */
+        /** Jitter if clock rate is available*/
+        base::Time sent_receiver_block_jitter;
+        /** Last Sender Report time */
         base::Time sent_receiver_block_lsr;
-        /** delay since last Sender Report in seconds */
-        double sent_receiver_block_dlsr;
+        /** delay since last Sender Report */
+        base::Time sent_receiver_block_dlsr;
 
         // Documentation not available
         uint32_t sent_picture_loss_count = 0;
