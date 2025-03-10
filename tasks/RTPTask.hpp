@@ -68,11 +68,14 @@ namespace gstreamer {
         /** Updates flags of a RTPSourceStatistics struct */
         uint8_t fetchFlags(const GstStructure* gst_stats);
 
-        /** NTP to Unix in Microseconds */
+        /** NTP Timestamp format to Unix in Microseconds */
         int64_t ntpToUnixMicroseconds(uint64_t ntp_timestamp);
 
-        /** NTP Short to Seconds */
-        double ntpShortToSeconds(uint32_t ntp_short);
+        /** NTP Short Format to Unix in Microseconds */
+        double ntpShortToUnixMicroseconds(uint64_t ntp_timestamp, uint32_t ntp_short);
+
+        /** NTP Short Format to Seconds */
+        double delayNTPShortToSeconds(uint32_t ntp_short);
 
         /** Extracts a array of receiver reports contained on a GST_TYPE_LIST of
          * GstStructures on the "received-rr" field of a RTPSource*/
@@ -88,6 +91,10 @@ namespace gstreamer {
         GstElement* m_bin;
         /** RTP sessions element */
         std::vector<GstElement*> m_rtp_internal_sessions;
+        /** Source stats which are always present */
+        RTPSourceStatistics m_source_stats;
+        /** NTP Timestamp */
+        uint64_t m_ntp_timestamp;
 
         /**
          * Hook called when the state machine transitions from PreOperational to
