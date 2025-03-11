@@ -148,8 +148,7 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
     sender_statistics.packets_lost = fetchInt(stats, "packets-lost");
     // Only calculates jitter in ms if there's a valid clock rate
     if (m_source_stats.clock_rate != 0) {
-        sender_statistics.jitter =
-            jitterToMicroseconds(fetchUnsignedInt(stats, "jitter"));
+        sender_statistics.jitter = jitterToTime(fetchUnsignedInt(stats, "jitter"));
     }
     sender_statistics.sent_picture_loss_count = fetchUnsignedInt(stats, "sent-pli-count");
     sender_statistics.sent_full_image_request_count =
@@ -159,7 +158,7 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
     sender_statistics.sent_nack_count = fetchUnsignedInt(stats, "sent-nack-count");
     sender_statistics.have_sr = fetchBoolean(stats, "have-sr");
     m_ntp_timestamp = fetch64UnsignedInt(stats, "sr-ntptime");
-    sender_statistics.sr_ntptime = ntpToUnixMicroseconds(m_ntp_timestamp);
+    sender_statistics.sr_ntptime = ntpToUnixEpoch(m_ntp_timestamp);
     sender_statistics.sr_rtptime_in_clock_rate_units =
         fetchUnsignedInt(stats, "sr-rtptime");
     sender_statistics.sr_octet_count = fetchUnsignedInt(stats, "sr-octet-count");
@@ -174,13 +173,12 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
     // Only calculates jitter in ms if there's a valid clock rate
     if (m_source_stats.clock_rate != 0) {
         sender_statistics.sent_receiver_block_jitter =
-            jitterToMicroseconds(fetchUnsignedInt(stats, "sent-rb-jitter"));
+            jitterToTime(fetchUnsignedInt(stats, "sent-rb-jitter"));
     }
     sender_statistics.sent_receiver_block_lsr =
-        ntpShortToUnixMicroseconds(m_ntp_timestamp,
-            fetchUnsignedInt(stats, "sent-rb-lsr"));
+        lsrTimeToUnixEpoch(m_ntp_timestamp, fetchUnsignedInt(stats, "sent-rb-lsr"));
     sender_statistics.sent_receiver_block_dlsr =
-        delayNTPShortToMicroseconds(fetchUnsignedInt(stats, "sent-rb-dlsr"));
+        NTPShortToTime(fetchUnsignedInt(stats, "sent-rb-dlsr"));
     sender_statistics.peer_receiver_reports = extractPeerReceiverReports(stats);
 
     return sender_statistics;
@@ -216,7 +214,7 @@ uint32_t RTPTask::fetchUnsignedInt(const GstStructure* structure, const char* fi
     return guint32_value;
 }
 
-uint32_t RTPTask::fetchInt(const GstStructure* structure, const char* fieldname)
+int32_t RTPTask::fetchInt(const GstStructure* structure, const char* fieldname)
 {
     gint gint_value;
     if (!gst_structure_get_int(structure, fieldname, &gint_value)) {
@@ -236,7 +234,7 @@ std::string RTPTask::fetchString(const GstStructure* structure, const char* fiel
     return std::string(gstr_value);
 }
 
-base::Time RTPTask::ntpToUnixMicroseconds(uint64_t ntp_timestamp)
+base::Time RTPTask::ntpToUnixEpoch(uint64_t ntp_timestamp)
 {
     // Extract seconds (upper 32 bits)
     uint32_t ntp_seconds = ntp_timestamp >> 32;
@@ -256,13 +254,13 @@ base::Time RTPTask::ntpToUnixMicroseconds(uint64_t ntp_timestamp)
 }
 
 // Only gets the seconds according to documentation
-base::Time RTPTask::delayNTPShortToMicroseconds(uint32_t ntp_short)
+base::Time RTPTask::NTPShortToTime(uint32_t ntp_short)
 {
     return base::Time::fromMicroseconds(
         (static_cast<uint64_t>(ntp_short) * 1000000ULL) >> 16);
 }
 
-base::Time RTPTask::ntpShortToUnixMicroseconds(uint64_t ntp_timestamp, uint32_t ntp_short)
+base::Time RTPTask::lsrTimeToUnixEpoch(uint64_t ntp_timestamp, uint32_t ntp_short)
 {
     // Extract ntp_timestamp most significative bits
     uint16_t ntp_fixed_seconds = ntp_timestamp >> 48;
@@ -274,21 +272,38 @@ base::Time RTPTask::ntpShortToUnixMicroseconds(uint64_t ntp_timestamp, uint32_t 
     uint32_t ntp_seconds =
         (static_cast<uint32_t>(ntp_fixed_seconds) << 16) + ntp_short_seconds;
 
+    // We use the ntp timestamp to calculate the fixed point for the
+    // last Sender Report timestamp but this can be problem if
+    // if the value of the seconds for the timestamps 17-bit
+    // doesn't change at the same moment, possibly causing one lsr sample to
+    // "go back in time" every 65536 seconds.
+    uint32_t ntp_timestamp_seconds = ntp_timestamp >> 32;
+    uint32_t seconds_offset;
+    if ((ntp_timestamp_seconds & 0x8000) && !(ntp_short_seconds & 0x8000)) {
+        // ntp_timestamp is 17-bit seconds before ntp_short_seconds
+        seconds_offset = 0x10000;
+    }
+    else if (!(ntp_timestamp_seconds & 0x8000) && (ntp_short_seconds & 0x8000)) {
+        // ntp_timestamp is 17-bit seconds after ntp_short_seconds
+        seconds_offset = -0x10000;
+    }
+
+    // fix time representation
+    ntp_seconds = (ntp_timestamp_seconds & 0xFFFF0000) + seconds_offset + ntp_short_seconds;
+
     // Convert ntp seconds to unix seconds
-    uint32_t unix_seconds = ntp_seconds - 2208988800;
+    uint64_t unix_seconds = ntp_seconds - 2208988800;
 
     // Get fractional part of ntp_short
-    // uint16_t fractional = static_cast<uint16_t>(ntp_short);
-    uint16_t fractional = ntp_short & 0xFFFF;
+    uint64_t fractional = ntp_short & 0xFFFF;
 
     // Create complete ntp timestamp using extracted values
-    uint64_t microseconds = (static_cast<uint64_t>(fractional) * 1000000ULL) >> 32;
+    uint64_t microseconds = (fractional * 1000000ULL) >> 32;
 
-    return base::Time::fromMicroseconds(
-        (static_cast<uint64_t>(unix_seconds) * 1000000ULL) + microseconds);
+    return base::Time::fromMicroseconds((unix_seconds * 1000000ULL) + microseconds);
 }
 
-base::Time RTPTask::jitterToMicroseconds(uint32_t jitter)
+base::Time RTPTask::jitterToTime(uint32_t jitter)
 {
     return base::Time::fromMicroseconds(
         (static_cast<uint64_t>(jitter) * 1000000ULL) / m_source_stats.clock_rate);
@@ -325,15 +340,13 @@ std::vector<RTPPeerReceiverReport> RTPTask::extractPeerReceiverReports(
         report.exthighestseq = fetchUnsignedInt(report_structure, "rb-exthighestseq");
         // Only calculates jitter in ms if there's a valid clock rate
         if (m_source_stats.clock_rate != 0) {
-            report.jitter =
-                jitterToMicroseconds(fetchUnsignedInt(report_structure, "rb-jitter"));
+            report.jitter = jitterToTime(fetchUnsignedInt(report_structure, "rb-jitter"));
         }
-        report.lsr = ntpShortToUnixMicroseconds(m_ntp_timestamp,
+        report.lsr = lsrTimeToUnixEpoch(m_ntp_timestamp,
             fetchUnsignedInt(report_structure, "rb-lsr"));
-        report.dlsr =
-            delayNTPShortToMicroseconds(fetchUnsignedInt(report_structure, "rb-dlsr"));
-        report.round_trip = delayNTPShortToMicroseconds(
-            fetchUnsignedInt(report_structure, "rb-round-trip"));
+        report.dlsr = NTPShortToTime(fetchUnsignedInt(report_structure, "rb-dlsr"));
+        report.round_trip =
+            NTPShortToTime(fetchUnsignedInt(report_structure, "rb-round-trip"));
         all_reports.push_back(report);
     }
 

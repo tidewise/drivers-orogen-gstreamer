@@ -129,7 +129,7 @@ namespace gstreamer {
         /** Lost 8-bit fraction */
         float fractionlost = 0;
         /** Lost packets */
-        uint32_t packetslost = 0;
+        int32_t packetslost = 0;
         /** Highest received seqnum */
         uint32_t exthighestseq = 0;
         /** Reception jitter if clock rate is present */
@@ -172,9 +172,9 @@ namespace gstreamer {
         std::string confirmations = "";
 
         /** First seqnum if known */
-        uint32_t seqnum_base = 0;
+        int32_t seqnum_base = 0;
         /** Clock rate of the media */
-        uint32_t clock_rate = 0;
+        int32_t clock_rate = 0;
     };
 
     struct RTPSenderStatistics {
@@ -197,9 +197,9 @@ namespace gstreamer {
 
         // Following fields are updated when "is-sender" is TRUE.
         /** Bitrate in bits/sec */
-        uint32_t bitrate = 0;
+        uint64_t bitrate = 0;
         /** Estimated amount of packets lost */
-        uint32_t packets_lost = 0;
+        int32_t packets_lost = 0;
         /** Estimated Jitter if clock rate is available */
         base::Time jitter;
 
@@ -217,12 +217,12 @@ namespace gstreamer {
         uint32_t sr_packet_count = 0;
 
         // The following fields are only present for non-internal sources and represent
-        // the content of the last RTB Buffer packet that was sent to this source. These
+        // the content of the last Report Block Buffer packet that was sent to this source. These
         // values are only updated when the source is sending.
-        /** Confirmation if a RTB Buffer has been sent */
+        /** Confirmation if a Report Block Buffer has been sent */
         bool sent_receiver_block = false;
         /** Lost Packets */
-        uint16_t sent_receiver_block_packetslost = 0;
+        uint32_t sent_receiver_block_packetslost = 0;
         /** calculated lost 8-bit fraction */
         float sent_receiver_block_fractionlost = 0;
         /** Last seen seqnum */
