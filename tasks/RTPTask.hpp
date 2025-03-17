@@ -1,5 +1,5 @@
-#ifndef RTPTASK_HPP
-#define RTPTASK_HPP
+#ifndef GSTREAMER_RTPTASK_TASK_HPP
+#define GSTREAMER_RTPTASK_TASK_HPP
 
 #include "gst/rtp/rtp.h"
 #include "gstreamer/RTPTaskBase.hpp"
@@ -85,7 +85,7 @@ namespace gstreamer {
          *  @param fieldname [char*]
          *  @return [bool]
          */
-        bool fetchBoolean(const GstStructure* structure, const char* fieldname);
+        static bool fetchBoolean(const GstStructure* structure, const char* fieldname);
 
         /** Fetchs a 64 unsigned int
          *
@@ -93,7 +93,7 @@ namespace gstreamer {
          *  @param fieldname [char*] The name of the field containing the variable
          *  @return [uint64_t]
          */
-        uint64_t fetch64UnsignedInt(const GstStructure* structure, const char* fieldname);
+        static uint64_t fetch64UnsignedInt(const GstStructure* structure, const char* fieldname);
 
         /** Fetchs a 32 unsigned int
          *
@@ -101,7 +101,7 @@ namespace gstreamer {
          *  @param fieldname [char*] The name of the field containing the variable
          *  @return [uint32_t]
          */
-        uint32_t fetchUnsignedInt(const GstStructure* structure, const char* fieldname);
+        static uint32_t fetchUnsignedInt(const GstStructure* structure, const char* fieldname);
 
         /** Fetchs a int
          *
@@ -109,7 +109,7 @@ namespace gstreamer {
          *  @param fieldname [char*] The name of the field containing the variable
          *  @return [int32_t]
          */
-        int32_t fetchInt(const GstStructure* structure, const char* fieldname);
+        static int32_t fetchInt(const GstStructure* structure, const char* fieldname);
 
         /** Fetchs a gstring and converts it to std::string
          *
@@ -117,14 +117,14 @@ namespace gstreamer {
          *  @param fieldname [char*] The name of the field containing the variable
          *  @return [std::string]
          */
-        std::string fetchString(const GstStructure* structure, const char* fieldname);
+        static std::string fetchString(const GstStructure* structure, const char* fieldname);
 
         /** Updates flags of a RTPSourceStatistics struct
          *
          *  @param gst_stats [GstStructure]
          *  @return [uint8_t]
          */
-        uint8_t fetchFlags(const GstStructure* gst_stats);
+        static uint8_t fetchFlags(const GstStructure* gst_stats);
 
         /** NTP Timestamp format to base::Time from Unix Epoch
          *

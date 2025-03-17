@@ -11,7 +11,9 @@ include(gstreamerBase)
 if (ROCK_TEST_ENABLED)
     enable_testing()
     find_package(Syskit REQUIRED)
+    find_package(Rock REQUIRED)
     syskit_orogen_tests(test)
+    add_subdirectory(test)
 
     set_tests_properties(test PROPERTIES
         ENVIRONMENT "ROBY_BASE_LOG_DIR=${ROCK_TEST_LOG_DIR};GST_DEBUG=3,webrtcbin:7;G_DEBUG=fatal_warnings"

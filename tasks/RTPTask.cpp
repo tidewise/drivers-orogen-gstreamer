@@ -31,6 +31,10 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
     GstStructure* gst_stats = nullptr;
     g_object_get(session, "stats", &gst_stats, NULL);
 
+    if (!gst_stats) {
+        throw std::runtime_error("gst-stats is not a boxed type");
+    }
+
     session_stats.recv_nack_count = fetchUnsignedInt(gst_stats, "recv-nack-count");
     session_stats.rtx_drop_count = fetchUnsignedInt(gst_stats, "rtx-drop-count");
     session_stats.sent_nack_count = fetchUnsignedInt(gst_stats, "sent-nack-count");
@@ -41,10 +45,6 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
         gst_structure_get_value(gst_stats, "source-stats");
     GValueArray* gst_source_stats =
         static_cast<GValueArray*>(g_value_get_boxed(gst_source_stats_value));
-
-    if (!gst_stats) {
-        throw std::runtime_error("gst-source-stats is not a boxed type");
-    }
 
     for (guint i = 0; i < gst_source_stats->n_values; i++) {
         GValue* value = g_value_array_get_nth(gst_source_stats, i);
@@ -230,8 +230,9 @@ std::string RTPTask::fetchString(const GstStructure* structure, const char* fiel
     if (gstr_value == nullptr) {
         return std::string("");
     }
-
-    return std::string(gstr_value);
+    std::string string = std::string(gstr_value);
+    g_free(&gstr_value);
+    return string;
 }
 
 base::Time RTPTask::ntpToUnixEpoch(uint64_t ntp_timestamp)
@@ -289,7 +290,8 @@ base::Time RTPTask::lsrTimeToUnixEpoch(uint64_t ntp_timestamp, uint32_t ntp_shor
     }
 
     // fix time representation
-    ntp_seconds = (ntp_timestamp_seconds & 0xFFFF0000) + seconds_offset + ntp_short_seconds;
+    ntp_seconds =
+        (ntp_timestamp_seconds & 0xFFFF0000) + seconds_offset + ntp_short_seconds;
 
     // Convert ntp seconds to unix seconds
     uint64_t unix_seconds = ntp_seconds - 2208988800;
@@ -365,6 +367,15 @@ bool RTPTask::configureHook()
         throw std::runtime_error("cannot find element named " +
                                  m_rtp_monitored_sessions.rtpbin_name + " in pipeline");
     }
+
+    // Free previous session variables.
+    // This cannot be done on stop hook since it
+    // will make tasks die unexpectedly on process server
+    for (auto const& internal_session : m_rtp_internal_sessions) {
+        g_free(internal_session);
+    }
+    // "Clear" m_rtp_internal_sessions
+    m_rtp_internal_sessions.resize(0);
 
     return true;
 }
