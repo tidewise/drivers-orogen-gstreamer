@@ -12,6 +12,7 @@ import_types_from "std"
 import_types_from "base"
 import_types_from "webrtc_base"
 import_types_from "iodrivers_base"
+import_types_from "tasks/RTPHelpers.hpp"
 
 OroGen::Spec::Deployment.register_global_initializer(:gstreamer)
 if defined?(OroGen::Gen::RTT_CPP::Deployment)

@@ -1,7 +1,6 @@
+#include <../tasks/RTPHelpers.hpp>
 #include <gst/gststructure.h>
 #include <gtest/gtest.h>
-
-#include <gstreamer/RTPTask.hpp>
 
 using namespace gstreamer;
 using namespace base;
@@ -10,12 +9,6 @@ using namespace std;
 struct RTPTaskTest : public ::testing::Test {
     RTPTaskTest()
     {
-    }
-
-    // Create RTPTask
-    RTPTask getTask()
-    {
-        return RTPTask("gstreamer::RTPTask");
     }
 
     GstStructure* createSourceStatsStructure()
@@ -143,14 +136,12 @@ struct RTPTaskTest : public ::testing::Test {
 
 TEST_F(RTPTaskTest, it_fills_RTPSourceStats)
 {
-    // Create Task
-    RTPTask task = getTask();
-
     // Create structure (source-stats)
     GstStructure* source_stats = createSourceStatsStructure();
 
     // Get Source_Statistics
-    RTPSourceStatistics source_statistics = task.extractRTPSourceStats(source_stats, std::string("bla"));
+    RTPSourceStatistics source_statistics =
+        extractRTPSourceStats(source_stats, std::string("bla"));
 
     ASSERT_EQ(source_statistics.stream_name, "bla");
     ASSERT_EQ(source_statistics.ssrc, 77);
@@ -166,14 +157,12 @@ TEST_F(RTPTaskTest, it_fills_RTPSourceStats)
 
 TEST_F(RTPTaskTest, it_fills_RTPSenderStatistics)
 {
-    // Create Task
-    RTPTask task = getTask();
-
     // Create structure (source-stats)
     GstStructure* source_stats = createSourceStatsStructure();
 
     // Get Source statistics
-    RTPSenderStatistics sender_statistics = task.extractRTPSenderStats(source_stats, 2);
+    RTPSenderStatistics sender_statistics =
+        extractRTPSenderStats(source_stats, 2);
 
     ASSERT_EQ(sender_statistics.payload_bytes_sent, 1);
     ASSERT_EQ(sender_statistics.packets_sent, 2);
@@ -209,15 +198,12 @@ TEST_F(RTPTaskTest, it_fills_RTPSenderStatistics)
 
 TEST_F(RTPTaskTest, it_fills_RTPReceiverStatistics)
 {
-    // Create Task
-    RTPTask task = getTask();
-
     // Create structure (source-stats)
     GstStructure* source_stats = createSourceStatsStructure();
 
     // Get Sender Statistics
     RTPReceiverStatistics receiver_statistics =
-        task.extractRTPReceiverStats(source_stats);
+        extractRTPReceiverStats(source_stats);
 
     ASSERT_EQ(receiver_statistics.rtp_from, "bla");
     ASSERT_EQ(receiver_statistics.rtcp_from, "ble");

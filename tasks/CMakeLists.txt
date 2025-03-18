@@ -2,7 +2,8 @@
 
 include(gstreamerTaskLib)
 ADD_LIBRARY(${GSTREAMER_TASKLIB_NAME} SHARED
-    ${GSTREAMER_TASKLIB_SOURCES})
+    ${GSTREAMER_TASKLIB_SOURCES}
+    RTPHelpers.cpp)
 add_dependencies(${GSTREAMER_TASKLIB_NAME}
     regen-typekit)
 
