@@ -179,7 +179,7 @@ namespace gstreamer {
         /** RTP bin element */
         GstElement* m_bin;
         /** RTP sessions element */
-        std::vector<GstElement*> m_rtp_internal_sessions;
+        std::vector<GstElement*> m_rtp_sessions;
         /** Source stats which are always present */
         RTPSourceStatistics m_source_stats;
         /** NTP Timestamp */

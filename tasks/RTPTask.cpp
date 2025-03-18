@@ -128,7 +128,7 @@ RTPReceiverStatistics RTPTask::extractRTPReceiverStats(const GstStructure* stats
     receiver_statistics.rtcp_from = fetchString(stats, "rtcp-from");
     receiver_statistics.received_nack_count = fetchUnsignedInt(stats, "recv-nack-count");
     receiver_statistics.received_packet_rate =
-        fetchUnsignedInt(stats, "reck-packet_rate");
+        fetchUnsignedInt(stats, "recv-packet-rate");
     receiver_statistics.received_picture_loss_count =
         fetchUnsignedInt(stats, "recv-pli-count");
 
@@ -186,7 +186,7 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
 
 bool RTPTask::fetchBoolean(const GstStructure* structure, const char* fieldname)
 {
-    gboolean gboolean_value;
+    gboolean gboolean_value = FALSE;
     if (!gst_structure_get_boolean(structure, fieldname, &gboolean_value)) {
         return false;
     }
@@ -196,7 +196,7 @@ bool RTPTask::fetchBoolean(const GstStructure* structure, const char* fieldname)
 
 uint64_t RTPTask::fetch64UnsignedInt(const GstStructure* structure, const char* fieldname)
 {
-    guint64 guint64_value;
+    guint64 guint64_value = 0;
     if (!gst_structure_get_uint64(structure, fieldname, &guint64_value)) {
         return 0;
     }
@@ -206,7 +206,7 @@ uint64_t RTPTask::fetch64UnsignedInt(const GstStructure* structure, const char* 
 
 uint32_t RTPTask::fetchUnsignedInt(const GstStructure* structure, const char* fieldname)
 {
-    guint guint32_value;
+    guint guint32_value = 0;
     if (!gst_structure_get_uint(structure, fieldname, &guint32_value)) {
         return 0;
     }
@@ -216,7 +216,7 @@ uint32_t RTPTask::fetchUnsignedInt(const GstStructure* structure, const char* fi
 
 int32_t RTPTask::fetchInt(const GstStructure* structure, const char* fieldname)
 {
-    gint gint_value;
+    gint gint_value = 0;
     if (!gst_structure_get_int(structure, fieldname, &gint_value)) {
         return 0;
     }
@@ -227,11 +227,16 @@ int32_t RTPTask::fetchInt(const GstStructure* structure, const char* fieldname)
 std::string RTPTask::fetchString(const GstStructure* structure, const char* fieldname)
 {
     const gchar* gstr_value = gst_structure_get_string(structure, fieldname);
+    std::string string("");
     if (gstr_value == nullptr) {
-        return std::string("");
+        return string;
     }
-    std::string string = std::string(gstr_value);
-    g_free(&gstr_value);
+
+    // This should be freed according to documentation but
+    // g_free was breaking tests with a invalid pointer error.
+    // By assigning the string: assign + g_free = double free.
+    // Therefore it's safe to assume this way does not leave any memory leaks.
+    string.assign(gstr_value);
     return string;
 }
 
@@ -279,7 +284,7 @@ base::Time RTPTask::lsrTimeToUnixEpoch(uint64_t ntp_timestamp, uint32_t ntp_shor
     // doesn't change at the same moment, possibly causing one lsr sample to
     // "go back in time" every 65536 seconds.
     uint32_t ntp_timestamp_seconds = ntp_timestamp >> 32;
-    uint32_t seconds_offset;
+    uint32_t seconds_offset = 0; // has to have a starting value or it breaks.
     if ((ntp_timestamp_seconds & 0x8000) && !(ntp_short_seconds & 0x8000)) {
         // ntp_timestamp is 17-bit seconds before ntp_short_seconds
         seconds_offset = 0x10000;
@@ -307,8 +312,12 @@ base::Time RTPTask::lsrTimeToUnixEpoch(uint64_t ntp_timestamp, uint32_t ntp_shor
 
 base::Time RTPTask::jitterToTime(uint32_t jitter)
 {
-    return base::Time::fromMicroseconds(
-        (static_cast<uint64_t>(jitter) * 1000000ULL) / m_source_stats.clock_rate);
+    if (jitter != 0) {
+        return base::Time::fromMicroseconds(
+            (static_cast<uint64_t>(jitter) * 1000000ULL) / m_source_stats.clock_rate);
+    }
+
+    return base::Time::fromSeconds(0);
 }
 
 std::vector<RTPPeerReceiverReport> RTPTask::extractPeerReceiverReports(
@@ -371,11 +380,11 @@ bool RTPTask::configureHook()
     // Free previous session variables.
     // This cannot be done on stop hook since it
     // will make tasks die unexpectedly on process server
-    for (auto const& internal_session : m_rtp_internal_sessions) {
+    for (auto const& internal_session : m_rtp_sessions) {
         g_free(internal_session);
     }
-    // "Clear" m_rtp_internal_sessions
-    m_rtp_internal_sessions.resize(0);
+    // "Clear" m_rtp_sessions
+    m_rtp_sessions.clear();
 
     return true;
 }
@@ -385,10 +394,11 @@ bool RTPTask::startHook()
     if (!RTPTaskBase::startHook())
         return false;
 
+    std::vector<GstElement*> sessions;
     for (auto const& monitored_session : m_rtp_monitored_sessions.sessions) {
         GstElement* session = nullptr;
         g_signal_emit_by_name(m_bin,
-            "get-internal-session",
+            "get-session",
             monitored_session.session_id,
             &session);
         if (!session) {
@@ -396,9 +406,10 @@ bool RTPTask::startHook()
                 "did not resolve provided session, wrong session ID " +
                 to_string(monitored_session.session_id) + " ?");
         }
-        m_rtp_internal_sessions.push_back(session);
+        sessions.push_back(session);
     }
 
+    m_rtp_sessions = sessions;
     return true;
 }
 
@@ -408,7 +419,7 @@ void RTPTask::updateHook()
 
     RTPStatistics stats;
     stats.time = base::Time::now();
-    for (auto const& element : m_rtp_internal_sessions) {
+    for (auto const& element : m_rtp_sessions) {
         stats.statistics.push_back(extractRTPSessionStats(element));
     }
     _rtp_statistics.write(stats);
