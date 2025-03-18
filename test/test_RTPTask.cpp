@@ -149,11 +149,8 @@ TEST_F(RTPTaskTest, it_fills_RTPSourceStats)
     // Create structure (source-stats)
     GstStructure* source_stats = createSourceStatsStructure();
 
-    // Change task rtp_bin_name
-    task.m_rtp_monitored_sessions.rtpbin_name = "bla";
-
     // Get Source_Statistics
-    RTPSourceStatistics source_statistics = task.extractRTPSourceStats(source_stats);
+    RTPSourceStatistics source_statistics = task.extractRTPSourceStats(source_stats, std::string("bla"));
 
     ASSERT_EQ(source_statistics.stream_name, "bla");
     ASSERT_EQ(source_statistics.ssrc, 77);
@@ -175,13 +172,8 @@ TEST_F(RTPTaskTest, it_fills_RTPSenderStatistics)
     // Create structure (source-stats)
     GstStructure* source_stats = createSourceStatsStructure();
 
-    // Change ClockRate
-    task.m_source_stats.clock_rate = 2;
-    // TO-DO Remove
-    task.m_ntp_timestamp = uint64_t(2208988800 + 946684809);
-
-    // Get Sender Statistics
-    RTPSenderStatistics sender_statistics = task.extractRTPSenderStats(source_stats);
+    // Get Source statistics
+    RTPSenderStatistics sender_statistics = task.extractRTPSenderStats(source_stats, 2);
 
     ASSERT_EQ(sender_statistics.payload_bytes_sent, 1);
     ASSERT_EQ(sender_statistics.packets_sent, 2);

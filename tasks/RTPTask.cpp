@@ -50,16 +50,17 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
         GValue* value = g_value_array_get_nth(gst_source_stats, i);
         GstStructure* gst_stats = static_cast<GstStructure*>(g_value_get_boxed(value));
 
-        m_source_stats = extractRTPSourceStats(gst_stats);
+        auto source_stats =
+            extractRTPSourceStats(gst_stats, m_rtp_monitored_sessions.rtpbin_name);
         bool sender = fetchBoolean(gst_stats, "is-sender");
         if (sender) {
-            auto sender_stats = extractRTPSenderStats(gst_stats);
-            sender_stats.source_stats = m_source_stats;
+            auto sender_stats = extractRTPSenderStats(gst_stats, source_stats.clock_rate);
+            sender_stats.source_stats = source_stats;
             session_stats.sender_stats.push_back(sender_stats);
         }
         else {
             auto receiver_stats = extractRTPReceiverStats(gst_stats);
-            receiver_stats.source_stats = m_source_stats;
+            receiver_stats.source_stats = source_stats;
             session_stats.receiver_stats.push_back(receiver_stats);
         }
     }
@@ -68,10 +69,11 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
     return session_stats;
 }
 
-RTPSourceStatistics RTPTask::extractRTPSourceStats(const GstStructure* gst_stats)
+RTPSourceStatistics RTPTask::extractRTPSourceStats(const GstStructure* gst_stats,
+    std::string rtpbin_name)
 {
     RTPSourceStatistics stats;
-    stats.stream_name = m_rtp_monitored_sessions.rtpbin_name;
+    stats.stream_name = rtpbin_name;
     stats.ssrc = fetchUnsignedInt(gst_stats, "ssrc");
     stats.flags = fetchFlags(gst_stats);
     stats.confirmations = stats.flagsToString();
@@ -135,7 +137,8 @@ RTPReceiverStatistics RTPTask::extractRTPReceiverStats(const GstStructure* stats
     return receiver_statistics;
 }
 
-RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
+RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats,
+    uint32_t clock_rate)
 {
     RTPSenderStatistics sender_statistics;
     sender_statistics.payload_bytes_sent = fetch64UnsignedInt(stats, "octets-sent");
@@ -147,8 +150,9 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
     sender_statistics.bitrate = fetch64UnsignedInt(stats, "bitrate");
     sender_statistics.packets_lost = fetchInt(stats, "packets-lost");
     // Only calculates jitter in ms if there's a valid clock rate
-    if (m_source_stats.clock_rate != 0) {
-        sender_statistics.jitter = jitterToTime(fetchUnsignedInt(stats, "jitter"));
+    if (clock_rate != 0) {
+        sender_statistics.jitter =
+            jitterToTime(fetchUnsignedInt(stats, "jitter"), clock_rate);
     }
     sender_statistics.sent_picture_loss_count = fetchUnsignedInt(stats, "sent-pli-count");
     sender_statistics.sent_full_image_request_count =
@@ -157,8 +161,8 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
         fetchUnsignedInt(stats, "recv-fir-count");
     sender_statistics.sent_nack_count = fetchUnsignedInt(stats, "sent-nack-count");
     sender_statistics.have_sr = fetchBoolean(stats, "have-sr");
-    m_ntp_timestamp = fetch64UnsignedInt(stats, "sr-ntptime");
-    sender_statistics.sr_ntptime = ntpToUnixEpoch(m_ntp_timestamp);
+    uint64_t ntp_timestamp = fetch64UnsignedInt(stats, "sr-ntptime");
+    sender_statistics.sr_ntptime = ntpToUnixEpoch(ntp_timestamp);
     sender_statistics.sr_rtptime_in_clock_rate_units =
         fetchUnsignedInt(stats, "sr-rtptime");
     sender_statistics.sr_octet_count = fetchUnsignedInt(stats, "sr-octet-count");
@@ -171,15 +175,16 @@ RTPSenderStatistics RTPTask::extractRTPSenderStats(const GstStructure* stats)
     sender_statistics.sent_receiver_block_exthighestseq =
         fetchUnsignedInt(stats, "sent-rb-exthighestseq");
     // Only calculates jitter in ms if there's a valid clock rate
-    if (m_source_stats.clock_rate != 0) {
+    if (clock_rate != 0) {
         sender_statistics.sent_receiver_block_jitter =
-            jitterToTime(fetchUnsignedInt(stats, "sent-rb-jitter"));
+            jitterToTime(fetchUnsignedInt(stats, "sent-rb-jitter"), clock_rate);
     }
     sender_statistics.sent_receiver_block_lsr =
-        lsrTimeToUnixEpoch(m_ntp_timestamp, fetchUnsignedInt(stats, "sent-rb-lsr"));
+        lsrTimeToUnixEpoch(ntp_timestamp, fetchUnsignedInt(stats, "sent-rb-lsr"));
     sender_statistics.sent_receiver_block_dlsr =
         NTPShortToTime(fetchUnsignedInt(stats, "sent-rb-dlsr"));
-    sender_statistics.peer_receiver_reports = extractPeerReceiverReports(stats);
+    sender_statistics.peer_receiver_reports =
+        extractPeerReceiverReports(stats, clock_rate, ntp_timestamp);
 
     return sender_statistics;
 }
@@ -310,18 +315,20 @@ base::Time RTPTask::lsrTimeToUnixEpoch(uint64_t ntp_timestamp, uint32_t ntp_shor
     return base::Time::fromMicroseconds((unix_seconds * 1000000ULL) + microseconds);
 }
 
-base::Time RTPTask::jitterToTime(uint32_t jitter)
+base::Time RTPTask::jitterToTime(uint32_t jitter, uint32_t clock_rate)
 {
     if (jitter != 0) {
         return base::Time::fromMicroseconds(
-            (static_cast<uint64_t>(jitter) * 1000000ULL) / m_source_stats.clock_rate);
+            (static_cast<uint64_t>(jitter) * 1000000ULL) / clock_rate);
     }
 
     return base::Time::fromSeconds(0);
 }
 
 std::vector<RTPPeerReceiverReport> RTPTask::extractPeerReceiverReports(
-    const GstStructure* structure)
+    const GstStructure* structure,
+    uint32_t clock_rate,
+    uint64_t ntp_timestamp)
 {
     const GValue* g_array_value = gst_structure_get_value(structure, "received-rr");
 
@@ -350,10 +357,10 @@ std::vector<RTPPeerReceiverReport> RTPTask::extractPeerReceiverReports(
         report.packetslost = fetchInt(report_structure, "rb-packetslost");
         report.exthighestseq = fetchUnsignedInt(report_structure, "rb-exthighestseq");
         // Only calculates jitter in ms if there's a valid clock rate
-        if (m_source_stats.clock_rate != 0) {
-            report.jitter = jitterToTime(fetchUnsignedInt(report_structure, "rb-jitter"));
+        if (clock_rate != 0) {
+            report.jitter = jitterToTime(fetchUnsignedInt(report_structure, "rb-jitter"), clock_rate);
         }
-        report.lsr = lsrTimeToUnixEpoch(m_ntp_timestamp,
+        report.lsr = lsrTimeToUnixEpoch(ntp_timestamp,
             fetchUnsignedInt(report_structure, "rb-lsr"));
         report.dlsr = NTPShortToTime(fetchUnsignedInt(report_structure, "rb-dlsr"));
         report.round_trip =

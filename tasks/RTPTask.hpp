@@ -52,10 +52,11 @@ namespace gstreamer {
 
         /** Extract the stats which are always present on a RTP Source
          *
-         * @param stat [GstStructure*] stats from a given source
+         * @param gst_stats [GstStructure*] stats from a given source
+         * @param rtpbin_name [std::string] from a given source
          * @return [RTPSourceStatistics] RTP Source obligatory stats
          */
-        RTPSourceStatistics extractRTPSourceStats(GstStructure const* stat);
+        static RTPSourceStatistics extractRTPSourceStats(GstStructure const* gst_stats, std::string rtpbin_name);
 
         /** Extract the Sender Stats from a RTP Source.
          *
@@ -64,9 +65,11 @@ namespace gstreamer {
          *  https://gstreamer.freedesktop.org/documentation/rtpmanager/RTPSource.html?gi-language=c#RTPSource:stats
          *
          * @param stats [GstStructure*] stats from a given source
+         * @param clock_rate [uint32_t] in clock rate units from RTPSource
          * @return [RTPSenderStatistics] RTP Sender Stats
          */
-        RTPSenderStatistics extractRTPSenderStats(GstStructure const* stats);
+        static RTPSenderStatistics extractRTPSenderStats(GstStructure const* stats,
+            uint32_t clock_rate);
 
         /** Extract the Stats from a RTP Receiver
          *
@@ -77,7 +80,7 @@ namespace gstreamer {
          * @param stats [GstStructure*] stats from a given source
          * @return [RTPSenderStatistics] RTP Receiver Stats
          */
-        RTPReceiverStatistics extractRTPReceiverStats(GstStructure const* stats);
+        static RTPReceiverStatistics extractRTPReceiverStats(GstStructure const* stats);
 
         /** Fetch the gbooleans and converts it to bool
          *
@@ -93,7 +96,8 @@ namespace gstreamer {
          *  @param fieldname [char*] The name of the field containing the variable
          *  @return [uint64_t]
          */
-        static uint64_t fetch64UnsignedInt(const GstStructure* structure, const char* fieldname);
+        static uint64_t fetch64UnsignedInt(const GstStructure* structure,
+            const char* fieldname);
 
         /** Fetchs a 32 unsigned int
          *
@@ -101,7 +105,8 @@ namespace gstreamer {
          *  @param fieldname [char*] The name of the field containing the variable
          *  @return [uint32_t]
          */
-        static uint32_t fetchUnsignedInt(const GstStructure* structure, const char* fieldname);
+        static uint32_t fetchUnsignedInt(const GstStructure* structure,
+            const char* fieldname);
 
         /** Fetchs a int
          *
@@ -117,7 +122,8 @@ namespace gstreamer {
          *  @param fieldname [char*] The name of the field containing the variable
          *  @return [std::string]
          */
-        static std::string fetchString(const GstStructure* structure, const char* fieldname);
+        static std::string fetchString(const GstStructure* structure,
+            const char* fieldname);
 
         /** Updates flags of a RTPSourceStatistics struct
          *
@@ -131,7 +137,7 @@ namespace gstreamer {
          * @param ntp_timestamp [uint64_t] NTP Timestamp 32.32
          * @return [base::Time] Time from Unix epoch
          */
-        base::Time ntpToUnixEpoch(uint64_t ntp_timestamp);
+        static base::Time ntpToUnixEpoch(uint64_t ntp_timestamp);
 
         /**
          * Transforms a Last Sender Report Time (NTP Format 16.16 Fixed Point) to
@@ -149,30 +155,33 @@ namespace gstreamer {
          * @param ntp_short Last SR Time (NTP Format 16.16 Fixed Point)
          * @return [base::Time] Time from Unix epoch
          */
-        base::Time lsrTimeToUnixEpoch(uint64_t ntp_timestamp, uint32_t ntp_short);
+        static base::Time lsrTimeToUnixEpoch(uint64_t ntp_timestamp, uint32_t ntp_short);
 
         /** NTP Short Format to base::Time
          *
          * @param ntp_short NTP Short Format 16.16 Fixed Point
          * @return [base::Time] Time from Unix epoch
          */
-        base::Time NTPShortToTime(uint32_t ntp_short);
+        static base::Time NTPShortToTime(uint32_t ntp_short);
 
         /** Converts Jitter from Clock Rate Units to base::Time
          *
          * @param jitter Jitter in Clock Rate Units
+         * @param clock_rate Units from RTP Source
          * @return [base::Time] Time from Unix epoch
          */
-        base::Time jitterToTime(uint32_t jitter);
+        static base::Time jitterToTime(uint32_t jitter, uint32_t clock_rate);
 
         /** Extracts a array of receiver reports contained on a GST_TYPE_LIST of
          * GstStructures on the "received-rr" field of a RTPSource
-         * 
+         *
          * @param structure [GstStructure*]
+         * @param clock_rate [uint32_t] Units
+         * @param ntp_timestamp NTP Timestamp of the RTP Source 32.32 format
          * @return [std::vector<RTPPeerReceiverReport>] Received peer reports
          * */
-        std::vector<RTPPeerReceiverReport> extractPeerReceiverReports(
-            const GstStructure* structure);
+        static std::vector<RTPPeerReceiverReport> extractPeerReceiverReports(
+            const GstStructure* structure, uint32_t clock_rate, uint64_t ntp_timestamp);
 
         /** RTP Monitored Settings */
         RTPMonitoredSessions m_rtp_monitored_sessions;
