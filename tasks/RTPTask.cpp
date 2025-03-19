@@ -25,7 +25,7 @@ RTPTask::~RTPTask()
 // hooks defined by Orocos::RTT. See Task.hpp for more detailed
 // documentation about them.
 
-RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
+RTPSessionStatistics RTPTask::updateRTPSessionStats(GstElement* session)
 {
     RTPSessionStatistics session_stats;
 
@@ -36,16 +36,7 @@ RTPSessionStatistics RTPTask::extractRTPSessionStats(GstElement* session)
         throw std::runtime_error("gst-stats is not a boxed type");
     }
 
-    session_stats.recv_nack_count =
-        fetchUnsignedInt(gst_stats, "recv-nack-count");
-    session_stats.rtx_drop_count =
-        fetchUnsignedInt(gst_stats, "rtx-drop-count");
-    session_stats.sent_nack_count =
-        fetchUnsignedInt(gst_stats, "sent-nack-count");
-    session_stats.recv_rtx_req_count =
-        fetchUnsignedInt(gst_stats, "recv-rtx-req-count");
-    session_stats.sent_rtx_req_count =
-        fetchUnsignedInt(gst_stats, "sent-rtx-req-count");
+    session_stats = extractRTPSessionStats(gst_stats);
 
     const GValue* gst_source_stats_value =
         gst_structure_get_value(gst_stats, "source-stats");
@@ -131,7 +122,7 @@ void RTPTask::updateHook()
     RTPStatistics stats;
     stats.time = base::Time::now();
     for (auto const& element : m_rtp_sessions) {
-        stats.statistics.push_back(extractRTPSessionStats(element));
+        stats.statistics.push_back(updateRTPSessionStats(element));
     }
     _rtp_statistics.write(stats);
 }

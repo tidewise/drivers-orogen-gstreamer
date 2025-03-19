@@ -39,7 +39,7 @@ namespace gstreamer {
 
         ~RTPTask();
 
-        /** Extract the Stats for the RTPSession
+        /** Update the Stats for the RTPSession
          *
          *  These are the stats from RTPSession as shown in the link below
          *  https://gstreamer.freedesktop.org/documentation/rtpmanager/RTPSession.html?gi-language=c#RTPSession:stats
@@ -48,7 +48,7 @@ namespace gstreamer {
          * @return [RTPSessionStatistics] Statistics from all RTP Sources in this RTP
          * Session
          */
-        RTPSessionStatistics extractRTPSessionStats(GstElement* session);
+        RTPSessionStatistics updateRTPSessionStats(GstElement* session);
 
         /** RTP Monitored Settings */
         RTPMonitoredSessions m_rtp_monitored_sessions;

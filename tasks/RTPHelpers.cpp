@@ -2,6 +2,7 @@
 
 #include <base-logging/Logging.hpp>
 #include "base/Time.hpp"
+#include "iostream"
 
 using namespace gstreamer;
 using namespace std;
@@ -124,6 +125,23 @@ RTPSenderStatistics gstreamer::extractRTPSenderStats(const GstStructure* stats,
         extractPeerReceiverReports(stats, clock_rate, ntp_timestamp);
 
     return sender_statistics;
+}
+
+RTPSessionStatistics gstreamer::extractRTPSessionStats(const GstStructure* gst_stats)
+{
+    RTPSessionStatistics session_statistics;
+    session_statistics.recv_nack_count =
+        fetchUnsignedInt(gst_stats, "recv-nack-count");
+    session_statistics.rtx_drop_count =
+        fetchUnsignedInt(gst_stats, "rtx-drop-count");
+    session_statistics.sent_nack_count =
+        fetchUnsignedInt(gst_stats, "sent-nack-count");
+    session_statistics.recv_rtx_req_count =
+        fetchUnsignedInt(gst_stats, "recv-rtx-req-count");
+    session_statistics.sent_rtx_req_count =
+        fetchUnsignedInt(gst_stats, "sent-rtx-req-count");
+
+    return session_statistics;
 }
 
 bool gstreamer::fetchBoolean(const GstStructure* structure, const char* fieldname)

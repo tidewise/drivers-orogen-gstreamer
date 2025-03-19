@@ -132,6 +132,27 @@ struct RTPTaskTest : public ::testing::Test {
             25,
             NULL);
     }
+
+    GstStructure* createSessionStatsStructure()
+    {
+        return gst_structure_new("application/x-rtp-session-stats",
+            "recv-nack-count",
+            G_TYPE_UINT,
+            1,
+            "rtx-drop-count",
+            G_TYPE_UINT,
+            2,
+            "sent-nack-count",
+            G_TYPE_UINT,
+            3,
+            "recv-rtx-req-count",
+            G_TYPE_UINT,
+            4,
+            "sent-rtx-req-count",
+            G_TYPE_UINT,
+            5,
+            NULL);
+    }
 };
 
 TEST_F(RTPTaskTest, it_fills_RTPSourceStats)
@@ -161,8 +182,7 @@ TEST_F(RTPTaskTest, it_fills_RTPSenderStatistics)
     GstStructure* source_stats = createSourceStatsStructure();
 
     // Get Source statistics
-    RTPSenderStatistics sender_statistics =
-        extractRTPSenderStats(source_stats, 2);
+    RTPSenderStatistics sender_statistics = extractRTPSenderStats(source_stats, 2);
 
     ASSERT_EQ(sender_statistics.payload_bytes_sent, 1);
     ASSERT_EQ(sender_statistics.packets_sent, 2);
@@ -202,8 +222,7 @@ TEST_F(RTPTaskTest, it_fills_RTPReceiverStatistics)
     GstStructure* source_stats = createSourceStatsStructure();
 
     // Get Sender Statistics
-    RTPReceiverStatistics receiver_statistics =
-        extractRTPReceiverStats(source_stats);
+    RTPReceiverStatistics receiver_statistics = extractRTPReceiverStats(source_stats);
 
     ASSERT_EQ(receiver_statistics.rtp_from, "bla");
     ASSERT_EQ(receiver_statistics.rtcp_from, "ble");
@@ -213,4 +232,47 @@ TEST_F(RTPTaskTest, it_fills_RTPReceiverStatistics)
 
     // Clean-up
     gst_structure_free(source_stats);
+}
+
+TEST_F(RTPTaskTest, it_fills_RTPSessionStatistics)
+{
+    // Create structure (source-stats)
+    GstStructure* session_stats = createSessionStatsStructure();
+
+    // Get Sender Statistics
+    RTPSessionStatistics session_statistics = extractRTPSessionStats(session_stats);
+
+    ASSERT_EQ(session_statistics.recv_nack_count, 1);
+    ASSERT_EQ(session_statistics.rtx_drop_count, 2);
+    ASSERT_EQ(session_statistics.sent_nack_count, 3);
+    ASSERT_EQ(session_statistics.recv_rtx_req_count, 4);
+    ASSERT_EQ(session_statistics.sent_rtx_req_count, 5);
+
+    // Clean-up
+    gst_structure_free(session_stats);
+}
+
+TEST_F(RTPTaskTest, it_properly_apply_time_offset)
+{
+    // The numbers will be expressed as HEX, since it's easier to understand
+    // First testing if the ntp_timestamp is older than the NTP_Short
+    uint64_t ntp_timestamp = uint64_t(0xBF00FFFF) << 32; // 3204513791
+    uint32_t ntp_short = uint32_t(1) << 16;
+    base::Time adjusted_time = lsrTimeToUnixEpoch(ntp_timestamp, ntp_short);
+
+    // NTP Timestamp + 2
+    base::Time expected_time = base::Time::fromSeconds(995524993);
+
+    ASSERT_EQ(adjusted_time, expected_time);
+
+    // Now if the ntp_timestamp is newer than the NTP_Short
+    ntp_timestamp = uint64_t(0xBF010000) << 32; // 3204513792
+    ntp_short = uint32_t(0xFFFF) << 16;
+
+    adjusted_time = lsrTimeToUnixEpoch(ntp_timestamp, ntp_short);
+
+    // NTP Timestamp - 1
+    expected_time = base::Time::fromSeconds(995524991);
+
+    ASSERT_EQ(adjusted_time, expected_time);
 }

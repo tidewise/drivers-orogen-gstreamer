@@ -219,6 +219,13 @@ namespace gstreamer {
      */
     RTPReceiverStatistics extractRTPReceiverStats(GstStructure const* stats);
 
+    /** Extract the Stats from a RTP Session
+     * 
+     * @param stats [GstStructure*] stats from a given session
+     * @return [RTPSessionStats] RTP Session Stats
+     */
+    RTPSessionStatistics extractRTPSessionStats(GstStructure const* gst_stats);
+
     /** Fetch the gbooleans and converts it to bool
      *
      *  @param structure [GstStructure*]
