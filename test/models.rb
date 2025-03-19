@@ -63,3 +63,13 @@ Syskit.extend_model OroGen.gstreamer.Task do
         properties.outputs = outputs
     end
 end
+
+Syskit.extend_model OroGen.gstreamer.RTPTask do
+    argument :rtp_monitored_sessions, default: []
+
+    def update_properties
+        super
+
+        properties.rtp_monitored_sessions = rtp_monitored_sessions
+    end
+end

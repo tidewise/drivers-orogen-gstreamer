@@ -12,6 +12,7 @@ import_types_from "std"
 import_types_from "base"
 import_types_from "webrtc_base"
 import_types_from "iodrivers_base"
+import_types_from "tasks/RTPHelpers.hpp"
 
 OroGen::Spec::Deployment.register_global_initializer(:gstreamer)
 if defined?(OroGen::Gen::RTT_CPP::Deployment)
@@ -62,6 +63,15 @@ task_context "Task", subclasses: "Common" do
     dynamic_output_port(/\w+/, ro_ptr("/base/samples/frame/Frame"))
 
     port_driven
+end
+
+task_context "RTPTask", subclasses: "Task" do
+    # The RTP Session and name
+    property "rtp_monitored_sessions", "/gstreamer/RTPMonitoredSessions"
+    # Statistics output port
+    output_port "rtp_statistics", "/gstreamer/RTPStatistics"
+
+    port_driven timeout: 0.1
 end
 
 # Common support for WebRTC
