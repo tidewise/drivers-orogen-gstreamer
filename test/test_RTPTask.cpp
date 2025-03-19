@@ -255,6 +255,7 @@ TEST_F(RTPTaskTest, it_fills_RTPSessionStatistics)
 TEST_F(RTPTaskTest, it_properly_apply_time_offset)
 {
     // The numbers will be expressed as HEX, since it's easier to understand
+    // Ref: https://www.terrific.tools/time/ntp-timestamp-converter
     // First testing if the ntp_timestamp is older than the NTP_Short
     uint64_t ntp_timestamp = uint64_t(0xBF00FFFF) << 32; // 3204513791
     uint32_t ntp_short = uint32_t(1) << 16;
