@@ -6,15 +6,9 @@
 
 namespace gstreamer {
 
-    /** Response from each connected peer to the RTP pipeline */
-    struct RTPMonitoredSession {
-        std::string name;
-        int session_id;
-    };
-
-    struct RTPMonitoredSessions {
+    struct RTPMonitoringConfig {
         std::string rtpbin_name;
-        std::vector<RTPMonitoredSession> sessions;
+        std::vector<uint32_t> sessions_id;
     };
 
     struct RTPPeerReceiverReport {

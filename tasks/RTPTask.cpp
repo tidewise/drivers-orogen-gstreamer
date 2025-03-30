@@ -48,7 +48,7 @@ RTPSessionStatistics RTPTask::updateRTPSessionStats(GstElement* session)
         GstStructure* gst_stats = static_cast<GstStructure*>(g_value_get_boxed(value));
 
         auto source_stats =
-            extractRTPSourceStats(gst_stats, m_rtp_monitored_sessions.rtpbin_name);
+            extractRTPSourceStats(gst_stats, m_rtp_monitoring_config.rtpbin_name);
         bool sender = fetchBoolean(gst_stats, "is-sender");
         if (sender) {
             auto sender_stats = extractRTPSenderStats(gst_stats, source_stats.clock_rate);
@@ -71,12 +71,12 @@ bool RTPTask::configureHook()
     if (!RTPTaskBase::configureHook())
         return false;
 
-    m_rtp_monitored_sessions = _rtp_monitored_sessions.get();
+    m_rtp_monitoring_config = _rtp_monitoring_config.get();
     m_bin = gst_bin_get_by_name(GST_BIN(m_pipeline),
-        m_rtp_monitored_sessions.rtpbin_name.c_str());
+        m_rtp_monitoring_config.rtpbin_name.c_str());
     if (!m_bin) {
         throw std::runtime_error("cannot find element named " +
-                                 m_rtp_monitored_sessions.rtpbin_name + " in pipeline");
+                                 m_rtp_monitoring_config.rtpbin_name + " in pipeline");
     }
 
     // Free previous session variables.
@@ -97,16 +97,16 @@ bool RTPTask::startHook()
         return false;
 
     std::vector<GstElement*> sessions;
-    for (auto const& monitored_session : m_rtp_monitored_sessions.sessions) {
+    for (uint32_t session_id : m_rtp_monitoring_config.sessions_id) {
         GstElement* session = nullptr;
         g_signal_emit_by_name(m_bin,
             "get-session",
-            monitored_session.session_id,
+            session_id,
             &session);
         if (!session) {
             throw std::runtime_error(
                 "did not resolve provided session, wrong session ID " +
-                to_string(monitored_session.session_id) + " ?");
+                to_string(session_id) + " ?");
         }
         sessions.push_back(session);
     }

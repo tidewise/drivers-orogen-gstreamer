@@ -51,7 +51,7 @@ namespace gstreamer {
         RTPSessionStatistics updateRTPSessionStats(GstElement* session);
 
         /** RTP Monitored Settings */
-        RTPMonitoredSessions m_rtp_monitored_sessions;
+        RTPMonitoringConfig m_rtp_monitoring_config;
         /** RTP bin element */
         GstElement* m_bin;
         /** RTP sessions element */
