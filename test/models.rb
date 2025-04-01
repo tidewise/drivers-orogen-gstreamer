@@ -65,11 +65,11 @@ Syskit.extend_model OroGen.gstreamer.Task do
 end
 
 Syskit.extend_model OroGen.gstreamer.RTPTask do
-    argument :rtp_monitored_sessions, default: []
+    argument :rtp_monitoring_config
 
     def update_properties
         super
 
-        properties.rtp_monitored_sessions = rtp_monitored_sessions
+        properties.rtp_monitoring_config = rtp_monitoring_config
     end
 end

@@ -36,8 +36,8 @@ describe OroGen.gstreamer.RTPTask do
                           ! udpsink host=127.0.0.1 port=#{port}
                   PIPELINE
               )
-              .with_arguments(rtp_monitored_sessions:
-                  { rtpbin_name: "rtptransmit", sessions: [{ session_id: 0 }] })
+              .with_arguments(rtp_monitoring_config:
+                  { rtpbin_name: "rtptransmit", sessions_id: [0] })
               .deployed_as("rtptransmit")
     end
 
@@ -54,8 +54,8 @@ describe OroGen.gstreamer.RTPTask do
                           ! filesink location=/dev/null
                   PIPELINE
               )
-              .with_arguments(rtp_monitored_sessions:
-                  { rtpbin_name: "rtpreceive", sessions: [{ session_id: 0 }] })
+              .with_arguments(rtp_monitoring_config:
+                  { rtpbin_name: "rtpreceive", sessions_id: [0] })
               .deployed_as("rtpreceive")
     end
 

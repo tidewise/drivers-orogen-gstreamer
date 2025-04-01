@@ -66,8 +66,8 @@ task_context "Task", subclasses: "Common" do
 end
 
 task_context "RTPTask", subclasses: "Task" do
-    # The RTP Session and name
-    property "rtp_monitored_sessions", "/gstreamer/RTPMonitoredSessions"
+    # The RTPBIN element name and session ids
+    property "rtp_monitoring_config", "/gstreamer/RTPMonitoringConfig"
     # Statistics output port
     output_port "rtp_statistics", "/gstreamer/RTPStatistics"
 
