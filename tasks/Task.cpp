@@ -1,7 +1,6 @@
 /* Generated from orogen/lib/orogen/templates/tasks/Task.cpp */
 
 #include <gst/gstcaps.h>
-#include <set>
 
 #include "Helpers.hpp"
 #include "Task.hpp"
