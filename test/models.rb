@@ -15,6 +15,14 @@ module Services
         input_port "in", "/iodrivers_base/RawPacket"
         output_port "out", "/iodrivers_base/RawPacket"
     end
+
+    data_service_type "RawOutput" do
+        output_port "out", "/iodrivers_base/RawPacket"
+    end
+
+    data_service_type "RawInput" do
+        input_port "in", "/iodrivers_base/RawPacket"
+    end
 end
 
 Syskit.extend_model OroGen.gstreamer.WebRTCCommonTask do
@@ -45,6 +53,8 @@ Syskit.extend_model OroGen.gstreamer.Task do
     argument :pipeline
     argument :inputs, default: []
     argument :outputs, default: []
+    argument :raw_inputs, default: []
+    argument :raw_outputs, default: []
 
     dynamic_service Services::ImageSink, as: "image_sink" do
         provides Services::ImageSink, as: name, "image" => name
@@ -54,6 +64,14 @@ Syskit.extend_model OroGen.gstreamer.Task do
         provides Services::ImageSource, as: name, "image" => name
     end
 
+    dynamic_service Services::RawInput, as: "raw_sink" do
+        provides Services::RawInput, as: name, "in" => name
+    end
+
+    dynamic_service Services::RawOutput, as: "raw_source" do
+        provides Services::RawOutput, as: name, "out" => name
+    end
+
     def update_properties
         super
 
@@ -61,6 +79,8 @@ Syskit.extend_model OroGen.gstreamer.Task do
         properties.pipeline = pipeline
         properties.inputs = inputs
         properties.outputs = outputs
+        properties.raw_inputs = raw_inputs
+        properties.raw_outputs = raw_outputs
     end
 end
 
