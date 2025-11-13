@@ -38,6 +38,24 @@ namespace gstreamer {
         RTT::os::Mutex m_sync;
         std::vector<std::string> m_error_queue;
 
+    public:
+        class DynamicPort {
+            RTT::TaskContext* m_task = nullptr;
+            RTT::base::PortInterface* m_port = nullptr;
+
+        public:
+            DynamicPort(RTT::TaskContext* task,
+                RTT::base::InputPortInterface* port,
+                bool event);
+            DynamicPort(RTT::TaskContext* task, RTT::base::OutputPortInterface* port);
+            DynamicPort(DynamicPort const&) = delete;
+            DynamicPort(DynamicPort&&);
+            ~DynamicPort();
+
+            RTT::base::PortInterface* get() noexcept;
+            RTT::base::PortInterface* release() noexcept;
+        };
+
     protected:
         typedef base::samples::frame::Frame Frame;
         typedef RTT::extras::ReadOnlyPointer<Frame> ROPtrFrame;
@@ -102,22 +120,6 @@ namespace gstreamer {
         void processInputs();
         void pushRawFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
         void pushCompressedFrame(GstElement* element, Frame const& frame);
-        class DynamicPort {
-            RTT::TaskContext* m_task = nullptr;
-            RTT::base::PortInterface* m_port = nullptr;
-
-        public:
-            DynamicPort(RTT::TaskContext* task,
-                RTT::base::InputPortInterface* port,
-                bool event);
-            DynamicPort(RTT::TaskContext* task, RTT::base::OutputPortInterface* port);
-            DynamicPort(DynamicPort const&) = delete;
-            DynamicPort(DynamicPort&&);
-            ~DynamicPort();
-
-            RTT::base::PortInterface* get() noexcept;
-            RTT::base::PortInterface* release() noexcept;
-        };
         std::vector<DynamicPort> m_dynamic_ports;
 
     public:
