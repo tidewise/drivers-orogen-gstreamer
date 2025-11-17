@@ -102,6 +102,11 @@ namespace gstreamer {
         void waitFirstFrames(base::Time const& deadline);
         void queueError(std::string const& message);
         virtual void startPipeline();
+        /*
+         * Push some data before starting the pipeline, so it actually starts when
+         * gst_element_set_state is used to set it to GST_STATE_PLAYING
+        */
+        virtual void preStartPushInitialData(base::Time const& deadline);
         virtual void destroyPipeline();
 
         static GstFlowReturn sourcePushSample(GstElement* sink, ConfiguredOutput** data);
