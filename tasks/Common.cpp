@@ -88,7 +88,7 @@ void Common::startPipeline()
     base::Time deadline = base::Time::now() + _pipeline_initialization_timeout.get();
 
     gst_element_set_state(GST_ELEMENT(m_pipeline), GST_STATE_PAUSED);
-    preStartPushInitialData(deadline);
+    waitForInitialData(deadline);
     auto ret = gst_element_set_state(GST_ELEMENT(m_pipeline), GST_STATE_PLAYING);
     while (ret == GST_STATE_CHANGE_ASYNC) {
         if (base::Time::now() > deadline) {
@@ -107,7 +107,7 @@ void Common::startPipeline()
     }
 }
 
-void Common::preStartPushInitialData(base::Time const& deadline)
+void Common::waitForInitialData(base::Time const& deadline)
 {
     waitFirstFrames(deadline);
 }

@@ -58,7 +58,7 @@ namespace gstreamer {
             RawOutputPort* out_port);
         void processRawInputs();
         void pushRawData(GstElement& appsrc, std::vector<std::uint8_t> const& data);
-        virtual void preStartPushInitialData(base::Time const& deadline) override;
+        virtual void waitForInitialData(base::Time const& deadline) override;
         void waitFirstRawData(base::Time const& deadline);
 
         /*

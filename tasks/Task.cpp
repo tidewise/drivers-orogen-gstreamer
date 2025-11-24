@@ -217,7 +217,7 @@ bool Task::startHook()
     return true;
 }
 
-void Task::preStartPushInitialData(base::Time const& deadline)
+void Task::waitForInitialData(base::Time const& deadline)
 {
     waitFirstFrames(deadline);
     waitFirstRawData(deadline);
