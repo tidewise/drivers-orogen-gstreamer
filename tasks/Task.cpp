@@ -4,6 +4,9 @@
 
 #include "Task.hpp"
 
+#include <chrono>
+#include <thread>
+
 using namespace std;
 using namespace gstreamer;
 using namespace base::samples::frame;
@@ -243,6 +246,8 @@ void Task::waitFirstRawData(base::Time const& deadline)
         if (!all && base::Time::now() > deadline) {
             throw runtime_error("timed out while waiting for the first frames");
         }
+
+        this_thread::sleep_for(10ms);
     }
 
     for (size_t i = 0; i < m_bound_raw_in.size(); i++) {

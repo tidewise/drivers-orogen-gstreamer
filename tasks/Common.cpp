@@ -3,6 +3,9 @@
 #include "Common.hpp"
 #include "Helpers.hpp"
 
+#include <chrono>
+#include <thread>
+
 using namespace gstreamer;
 using namespace std;
 
@@ -190,6 +193,7 @@ void Common::waitFirstFrames(base::Time const& deadline)
         if (!all && base::Time::now() > deadline) {
             throw std::runtime_error("timed out while waiting for the first frames");
         }
+        this_thread::sleep_for(10ms);
     }
 
     for (auto& configured_input : m_configured_inputs) {
