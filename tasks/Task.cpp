@@ -8,12 +8,12 @@ using namespace std;
 using namespace gstreamer;
 using namespace base::samples::frame;
 
-void movePortsToRegistry(std::vector<Common::DynamicPort>& ports,
-    std::vector<Common::DynamicPort>& registry);
+void movePortsToRegistry(vector<Common::DynamicPort>& ports,
+    vector<Common::DynamicPort>& registry);
 
 GstElement* fetchElement(GstElement& pipeline, string const& name);
 
-Task::Task(std::string const& name)
+Task::Task(string const& name)
     : TaskBase(name)
 {
 }
@@ -52,15 +52,15 @@ bool Task::configureHook()
 
 void Task::configureRawIO(GstElement& pipeline)
 {
-    std::vector<DynamicPort> in_ports;
-    std::tie(in_ports, m_bound_raw_in) =
+    vector<DynamicPort> in_ports;
+    tie(in_ports, m_bound_raw_in) =
         validatePortsWithElements<RawInputPort, true>(pipeline, _raw_inputs.get());
     for (auto& binding : m_bound_raw_in) {
         g_object_set(binding.app_element, "is-live", TRUE, NULL);
     }
 
-    std::vector<DynamicPort> out_ports;
-    std::tie(out_ports, m_bound_raw_out) =
+    vector<DynamicPort> out_ports;
+    tie(out_ports, m_bound_raw_out) =
         validatePortsWithElements<RawOutputPort, false>(pipeline, _raw_outputs.get());
     setupRawOutputs();
 
@@ -71,20 +71,19 @@ void Task::configureRawIO(GstElement& pipeline)
 }
 
 template <typename T, bool input>
-std::pair<std::vector<Task::DynamicPort>, std::vector<Task::ElementPortBinding<T>>> Task::
-    validatePortsWithElements(GstElement& pipeline,
-        std::vector<std::string> const& port_names)
+pair<std::vector<Task::DynamicPort>, std::vector<Task::ElementPortBinding<T>>> Task::
+    validatePortsWithElements(GstElement& pipeline, vector<std::string> const& port_names)
 {
-    std::vector<DynamicPort> ports;
+    vector<DynamicPort> ports;
     ports.reserve(port_names.size());
-    std::vector<ElementPortBinding<T>> bindings;
+    vector<ElementPortBinding<T>> bindings;
     bindings.reserve(port_names.size());
     for (auto& port_name : port_names) {
         if (provides()->hasService(port_name)) {
-            throw std::runtime_error("name collision in input port creation: " +
-                                     port_name + " already exists");
+            throw runtime_error("name collision in input port creation: " + port_name +
+                                " already exists");
         }
-        std::unique_ptr<T> port(new T(port_name));
+        unique_ptr<T> port(new T(port_name));
         GstElement* el = fetchElement(pipeline, port_name);
         bindings.emplace_back(port.get(), el);
 
@@ -96,14 +95,14 @@ std::pair<std::vector<Task::DynamicPort>, std::vector<Task::ElementPortBinding<T
         }
     }
 
-    return {std::move(ports), std::move(bindings)};
+    return {move(ports), std::move(bindings)};
 }
 
 GstElement* fetchElement(GstElement& pipeline, string const& name)
 {
     GstUnrefGuard app_element(gst_bin_get_by_name(GST_BIN(&pipeline), name.c_str()));
     if (!app_element.get()) {
-        throw std::runtime_error("cannot find element named " + name + " in pipeline");
+        throw runtime_error("cannot find element named " + name + " in pipeline");
     }
 
     return app_element.get();
@@ -141,7 +140,7 @@ GstFlowReturn Task::processAppSinkNewRawSample(GstElement* appsink,
 
     iodrivers_base::RawPacket out;
     out.data.resize(map_info.size);
-    std::copy(map_info.data, map_info.data + map_info.size, out.data.begin());
+    copy(map_info.data, map_info.data + map_info.size, out.data.begin());
     // TODO: take the buffer timestamp (if it is there)
     out.time = base::Time::now();
     out_port->write(out);
@@ -149,10 +148,10 @@ GstFlowReturn Task::processAppSinkNewRawSample(GstElement* appsink,
     return GST_FLOW_OK;
 }
 
-void movePortsToRegistry(std::vector<Common::DynamicPort>& ports,
-    std::vector<Common::DynamicPort>& registry)
+void movePortsToRegistry(vector<Common::DynamicPort>& ports,
+    vector<Common::DynamicPort>& registry)
 {
-    std::move(ports.begin(), ports.end(), std::back_insert_iterator(registry));
+    move(ports.begin(), ports.end(), std::back_insert_iterator(registry));
 }
 
 GstElement* Task::constructPipeline()
@@ -164,20 +163,20 @@ GstElement* Task::constructPipeline()
     if (error != NULL) {
         string error_message = "could not construct pipeline: " + string(error->message);
         g_clear_error(&error);
-        throw std::runtime_error(error_message);
+        throw runtime_error(error_message);
     }
 
     return element;
 }
 
-std::vector<Task::DynamicPort> Task::configureInputs(GstElement* pipeline)
+vector<Task::DynamicPort> Task::configureInputs(GstElement* pipeline)
 {
     auto config = _inputs.get();
-    std::vector<DynamicPort> ports;
+    vector<DynamicPort> ports;
     for (auto const& input_config : config) {
         if (provides()->hasService(input_config.name)) {
-            throw std::runtime_error("name collision in input port creation: " +
-                                     input_config.name + " already exists");
+            throw runtime_error("name collision in input port creation: " +
+                                input_config.name + " already exists");
         }
         unique_ptr<FrameInputPort> port(new FrameInputPort(input_config.name));
         configureInput(pipeline, input_config.name, true, *port);
@@ -187,14 +186,14 @@ std::vector<Task::DynamicPort> Task::configureInputs(GstElement* pipeline)
     return ports;
 }
 
-std::vector<Task::DynamicPort> Task::configureOutputs(GstElement* pipeline)
+vector<Task::DynamicPort> Task::configureOutputs(GstElement* pipeline)
 {
     auto config = _outputs.get();
-    std::vector<DynamicPort> ports;
+    vector<DynamicPort> ports;
     for (auto const& output_config : config) {
         if (provides()->hasService(output_config.name)) {
-            throw std::runtime_error("name collision in output port creation: " +
-                                     output_config.name + " already exists");
+            throw runtime_error("name collision in output port creation: " +
+                                output_config.name + " already exists");
         }
         unique_ptr<FrameOutputPort> port(new FrameOutputPort(output_config.name));
         configureOutput(pipeline,
@@ -226,7 +225,7 @@ void Task::waitForInitialData(base::Time const& deadline)
 void Task::waitFirstRawData(base::Time const& deadline)
 {
     bool all = false;
-    std::vector<iodrivers_base::RawPacket> received(m_bound_raw_in.size());
+    vector<iodrivers_base::RawPacket> received(m_bound_raw_in.size());
     while (!all) {
         all = true;
         for (size_t i = 0; i < m_bound_raw_in.size(); i++) {
@@ -242,7 +241,7 @@ void Task::waitFirstRawData(base::Time const& deadline)
         }
 
         if (!all && base::Time::now() > deadline) {
-            throw std::runtime_error("timed out while waiting for the first frames");
+            throw runtime_error("timed out while waiting for the first frames");
         }
     }
 
@@ -273,7 +272,7 @@ void Task::processRawInputs()
     }
 }
 
-void Task::pushRawData(GstElement& appsrc, std::vector<std::uint8_t> const& data)
+void Task::pushRawData(GstElement& appsrc, vector<std::uint8_t> const& data)
 {
     GstUnrefGuard buffer(gst_buffer_new_and_alloc(data.size()));
     gst_buffer_fill(buffer.get(), 0, data.data(), data.size());
@@ -281,7 +280,7 @@ void Task::pushRawData(GstElement& appsrc, std::vector<std::uint8_t> const& data
     g_signal_emit_by_name(&appsrc, "push-buffer", buffer.get(), &ret);
 
     if (ret != GST_FLOW_OK) {
-        throw std::runtime_error("failed to push raw data to buffer");
+        throw runtime_error("failed to push raw data to buffer");
     }
 }
 
