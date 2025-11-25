@@ -44,6 +44,53 @@ describe OroGen.gstreamer.Task do
         end
     end
 
+    describe "raw packets io" do
+        attr_reader :task, :out_reader
+        before do
+            @task = syskit_deploy_and_configure(raw_io_task_m)
+            @out_reader = syskit_create_reader(task.raw_out_port)
+        end
+
+        it "can forward raw_in to raw_out through the pipeline" do
+            # give initial data so the pipeline can start
+            w = syskit_create_writer task.raw_in_port
+            expect_execution { task.start! }
+                .poll { w.write raw_packet("init-bytes".bytes) }
+                .to_emit(task.start_event)
+
+            packet = raw_packet("dummy-input".bytes)
+            raw_out_s =
+                expect_execution do
+                    syskit_write task.raw_in_port, packet
+                end.to do
+                    have_one_new_sample(task.raw_out_port)
+                        .matching { _1.data == packet.data }
+                end
+        end
+
+        def raw_packet(data)
+            Types.iodrivers_base.RawPacket.new(
+                time: Time.now,
+                data: data
+            )
+        end
+
+        def raw_io_task_m
+            OroGen.gstreamer.Task
+                  .with_dynamic_service("raw_sink", as: "raw_in")
+                  .with_dynamic_service("raw_source", as: "raw_out")
+                  .with_arguments(
+                    raw_inputs: %w[raw_in],
+                    raw_outputs: %w[raw_out],
+                    pipeline: <<~PIPELINE
+                        appsrc format=2 name=raw_in
+                        ! appsink name=raw_out
+                    PIPELINE
+                  )
+                  .deployed_as("raw_io_test")
+        end
+    end
+
     def generator_m(width = 320, height = 240)
         OroGen.gstreamer.Task.with_dynamic_service("image_source", as: "out")
               .with_arguments(

@@ -3,6 +3,9 @@
 #include "Common.hpp"
 #include "Helpers.hpp"
 
+#include <chrono>
+#include <thread>
+
 using namespace gstreamer;
 using namespace std;
 
@@ -88,8 +91,7 @@ void Common::startPipeline()
     base::Time deadline = base::Time::now() + _pipeline_initialization_timeout.get();
 
     gst_element_set_state(GST_ELEMENT(m_pipeline), GST_STATE_PAUSED);
-    waitFirstFrames(deadline);
-
+    waitForInitialData(deadline);
     auto ret = gst_element_set_state(GST_ELEMENT(m_pipeline), GST_STATE_PLAYING);
     while (ret == GST_STATE_CHANGE_ASYNC) {
         if (base::Time::now() > deadline) {
@@ -106,6 +108,11 @@ void Common::startPipeline()
     if (ret == GST_STATE_CHANGE_FAILURE) {
         throw std::runtime_error("pipeline failed to start");
     }
+}
+
+void Common::waitForInitialData(base::Time const& deadline)
+{
+    waitFirstFrames(deadline);
 }
 
 void Common::configureOutput(GstElement* pipeline,
@@ -186,6 +193,7 @@ void Common::waitFirstFrames(base::Time const& deadline)
         if (!all && base::Time::now() > deadline) {
             throw std::runtime_error("timed out while waiting for the first frames");
         }
+        this_thread::sleep_for(10ms);
     }
 
     for (auto& configured_input : m_configured_inputs) {

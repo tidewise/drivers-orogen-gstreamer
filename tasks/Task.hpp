@@ -3,7 +3,11 @@
 #ifndef GSTREAMER_TASK_TASK_HPP
 #define GSTREAMER_TASK_TASK_HPP
 
+#include "Helpers.hpp"
+
+#include "gst/gstelement.h"
 #include "gstreamer/TaskBase.hpp"
+#include "iodrivers_base/RawPacket.hpp"
 
 #include <gst/app/gstappsink.h>
 #include <gst/app/gstappsrc.h>
@@ -23,11 +27,55 @@ namespace gstreamer {
          */
         friend class TaskBase;
 
+    public:
+        using RawInputPort = RTT::InputPort<iodrivers_base::RawPacket>;
+        using RawOutputPort = RTT::OutputPort<iodrivers_base::RawPacket>;
+
+        template <typename T> struct ElementPortBinding {
+            ElementPortBinding(T* p, GstElement* e)
+                : port{p}
+                , app_element{e}
+            {
+            }
+            T* port = nullptr;
+            // app_element is an appsrc (appsink) for an input (output) port
+            GstElement* app_element = nullptr;
+        };
+        using BoundRawInput = ElementPortBinding<RawInputPort>;
+        using BoundRawOutput = ElementPortBinding<RawOutputPort>;
+
     protected:
+        std::vector<ElementPortBinding<RawInputPort>> m_bound_raw_in;
+        std::vector<ElementPortBinding<RawOutputPort>> m_bound_raw_out;
         GstElement* constructPipeline();
 
         std::vector<DynamicPort> configureInputs(GstElement* pipeline);
         std::vector<DynamicPort> configureOutputs(GstElement* pipeline);
+
+        void configureRawIO(GstElement& pipeline);
+        void setupRawOutputs();
+        static GstFlowReturn processAppSinkNewRawSample(GstElement* appsink,
+            RawOutputPort* out_port);
+        void processRawInputs();
+        void pushRawData(GstElement& appsrc, std::vector<std::uint8_t> const& data);
+        virtual void waitForInitialData(base::Time const& deadline) override;
+        void waitFirstRawData(base::Time const& deadline);
+
+        /*
+         * Validates ports against pipeline elements and adds them (the ports) on the
+         * component's dataflow interface
+         *
+         * Throws if a port does not have a corresponding pipeline element
+         *
+         * @return pair of vectors. First one has DynamicPort elements which are the
+         * ports dynamically added to the component (see Commmon.hpp).
+         * The second has ElementPortBinding elements, used for exchanging data between
+         * the in/out ports and the pipeline
+         */
+        template <typename T, bool input>
+        std::pair<std::vector<DynamicPort>, std::vector<ElementPortBinding<T>>>
+        validatePortsWithElements(GstElement& pipeline,
+            std::vector<std::string> const& port_names);
 
     public:
         /** TaskContext constructor for Task

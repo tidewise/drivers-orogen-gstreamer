@@ -59,8 +59,14 @@ task_context "Task", subclasses: "Common" do
     # Configuration of Rock output ports to be attached to the pipeline
     property "outputs", "/std/vector</gstreamer/OutputConfig>"
 
+    property "raw_inputs", "/std/vector</std/string>"
+
+    property "raw_outputs", "/std/vector</std/string>"
+
     dynamic_input_port(/\w+/, ro_ptr("/base/samples/frame/Frame"))
+    dynamic_input_port(/\w+/, "/iodrivers_base/RawPacket")
     dynamic_output_port(/\w+/, ro_ptr("/base/samples/frame/Frame"))
+    dynamic_output_port(/\w+/, "/iodrivers_base/RawPacket")
 
     port_driven
 end
