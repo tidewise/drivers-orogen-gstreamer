@@ -258,11 +258,11 @@ void Task::waitFirstRawData(base::Time const& deadline)
 void Task::updateHook()
 {
     TaskBase::updateHook();
+}
 
-    if (!m_pipeline) {
-        return;
-    }
-
+void Task::processInputs()
+{
+    processFrameInputs();
     processRawInputs();
 }
 

@@ -224,6 +224,11 @@ void Common::waitFirstFrames(base::Time const& deadline)
 
 void Common::processInputs()
 {
+    processFrameInputs();
+}
+
+void Common::processFrameInputs()
+{
     for (auto& configured_input : m_configured_inputs) {
         while (configured_input.port->read(configured_input.frame, false) == RTT::NewData) {
             Frame const& frame = *configured_input.frame;
