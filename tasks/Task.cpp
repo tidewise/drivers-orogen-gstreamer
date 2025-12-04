@@ -10,6 +10,7 @@
 using namespace std;
 using namespace gstreamer;
 using namespace base::samples::frame;
+using iodrivers_base::RawPacket;
 
 void movePortsToRegistry(vector<Common::DynamicPort>& ports,
     vector<Common::DynamicPort>& registry);
@@ -57,14 +58,16 @@ void Task::configureRawIO(GstElement& pipeline)
 {
     vector<DynamicPort> in_ports;
     tie(in_ports, m_bound_raw_in) =
-        validatePortsWithElements<RawInputPort, true>(pipeline, _raw_inputs.get());
+        validatePortsWithElements<RTT::InputPort, RawPacket, true>(pipeline,
+            _raw_inputs.get());
     for (auto& binding : m_bound_raw_in) {
         g_object_set(binding.app_element, "is-live", TRUE, NULL);
     }
 
     vector<DynamicPort> out_ports;
     tie(out_ports, m_bound_raw_out) =
-        validatePortsWithElements<RawOutputPort, false>(pipeline, _raw_outputs.get());
+        validatePortsWithElements<RTT::OutputPort, RawPacket, false>(pipeline,
+            _raw_outputs.get());
     setupRawOutputs();
 
     // stores the new ports on the m_dynamic_ports registry
@@ -73,20 +76,20 @@ void Task::configureRawIO(GstElement& pipeline)
     movePortsToRegistry(out_ports, m_dynamic_ports);
 }
 
-template <typename T, bool input>
-pair<std::vector<Task::DynamicPort>, std::vector<Task::ElementPortBinding<T>>> Task::
+template <template <typename> class Port, typename T, bool input>
+pair<std::vector<Task::DynamicPort>, std::vector<Task::ElementPortBinding<Port, T>>> Task::
     validatePortsWithElements(GstElement& pipeline, vector<std::string> const& port_names)
 {
     vector<DynamicPort> ports;
     ports.reserve(port_names.size());
-    vector<ElementPortBinding<T>> bindings;
+    vector<ElementPortBinding<Port, T>> bindings;
     bindings.reserve(port_names.size());
     for (auto& port_name : port_names) {
         if (provides()->hasService(port_name)) {
             throw runtime_error("name collision in input port creation: " + port_name +
                                 " already exists");
         }
-        unique_ptr<T> port(new T(port_name));
+        unique_ptr<Port<T>> port(new Port<T>(port_name));
         GstElement* el = fetchElement(pipeline, port_name);
         bindings.emplace_back(port.get(), el);
 
@@ -118,12 +121,12 @@ void Task::setupRawOutputs()
         g_signal_connect(bound_out.app_element,
             "new-sample",
             G_CALLBACK(processAppSinkNewRawSample),
-            bound_out.port);
+            &bound_out);
     }
 }
 
 GstFlowReturn Task::processAppSinkNewRawSample(GstElement* appsink,
-    RawOutputPort* out_port)
+    BoundRawOutput* binding)
 {
     // pull sample -> retrieve the buffer -> map the buffer
     GstUnrefGuard sample(gst_app_sink_pull_sample(GST_APP_SINK(appsink)));
@@ -141,12 +144,12 @@ GstFlowReturn Task::processAppSinkNewRawSample(GstElement* appsink,
     }
     GstMemoryUnmapGuard memory_map(memory.get(), map_info);
 
-    iodrivers_base::RawPacket out;
+    RawPacket& out = binding->memory;
     out.data.resize(map_info.size);
     copy(map_info.data, map_info.data + map_info.size, out.data.begin());
     // TODO: take the buffer timestamp (if it is there)
     out.time = base::Time::now();
-    out_port->write(out);
+    binding->port->write(out);
 
     return GST_FLOW_OK;
 }
@@ -228,19 +231,14 @@ void Task::waitForInitialData(base::Time const& deadline)
 void Task::waitFirstRawData(base::Time const& deadline)
 {
     bool all = false;
-    vector<iodrivers_base::RawPacket> received(m_bound_raw_in.size());
     while (!all) {
         all = true;
-        for (size_t i = 0; i < m_bound_raw_in.size(); i++) {
-            if (!received[i].data.empty()) {
+        for (auto& binding : m_bound_raw_in) {
+            if (!binding.memory.data.empty()) {
                 continue;
             }
 
-            auto& binding = m_bound_raw_in[i];
-            if (binding.port->read(received[i]) == RTT::NoData) {
-                all = false;
-                continue;
-            }
+            all = binding.port->read(binding.memory, false) != RTT::NoData;
         }
 
         if (!all && base::Time::now() > deadline) {
@@ -250,8 +248,8 @@ void Task::waitFirstRawData(base::Time const& deadline)
         this_thread::sleep_for(10ms);
     }
 
-    for (size_t i = 0; i < m_bound_raw_in.size(); i++) {
-        pushRawData(*m_bound_raw_in[i].app_element, received[i].data);
+    for (auto& binding : m_bound_raw_in) {
+        pushRawData(*binding.app_element, binding.memory.data);
     }
 }
 
@@ -268,11 +266,10 @@ void Task::processInputs()
 
 void Task::processRawInputs()
 {
-    iodrivers_base::RawPacket input;
     for (auto& binding : m_bound_raw_in) {
         GstElement* appsrc = binding.app_element;
-        while (binding.port->read(input, false) == RTT::NewData) {
-            pushRawData(*appsrc, input.data);
+        while (binding.port->read(binding.memory, false) == RTT::NewData) {
+            pushRawData(*appsrc, binding.memory.data);
         }
     }
 }
