@@ -122,7 +122,8 @@ namespace gstreamer {
             Common::ConfiguredOutput* data,
             std::unique_ptr<base::samples::frame::Frame>& frame);
 
-        void processInputs();
+        virtual void processInputs();
+        void processFrameInputs();
         void pushRawFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
         void pushCompressedFrame(GstElement* element, Frame const& frame);
         std::vector<DynamicPort> m_dynamic_ports;

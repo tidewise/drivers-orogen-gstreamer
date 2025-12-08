@@ -31,22 +31,25 @@ namespace gstreamer {
         using RawInputPort = RTT::InputPort<iodrivers_base::RawPacket>;
         using RawOutputPort = RTT::OutputPort<iodrivers_base::RawPacket>;
 
-        template <typename T> struct ElementPortBinding {
-            ElementPortBinding(T* p, GstElement* e)
+        template <template <typename> class Port, typename T> struct ElementPortBinding {
+            ElementPortBinding(Port<T>* p, GstElement* e)
                 : port{p}
                 , app_element{e}
             {
             }
-            T* port = nullptr;
+            Port<T>* port = nullptr;
+            T memory;
             // app_element is an appsrc (appsink) for an input (output) port
             GstElement* app_element = nullptr;
         };
-        using BoundRawInput = ElementPortBinding<RawInputPort>;
-        using BoundRawOutput = ElementPortBinding<RawOutputPort>;
+        using BoundRawInput =
+            ElementPortBinding<RTT::InputPort, iodrivers_base::RawPacket>;
+        using BoundRawOutput =
+            ElementPortBinding<RTT::OutputPort, iodrivers_base::RawPacket>;
 
     protected:
-        std::vector<ElementPortBinding<RawInputPort>> m_bound_raw_in;
-        std::vector<ElementPortBinding<RawOutputPort>> m_bound_raw_out;
+        std::vector<BoundRawInput> m_bound_raw_in;
+        std::vector<BoundRawOutput> m_bound_raw_out;
         GstElement* constructPipeline();
 
         std::vector<DynamicPort> configureInputs(GstElement* pipeline);
@@ -55,10 +58,11 @@ namespace gstreamer {
         void configureRawIO(GstElement& pipeline);
         void setupRawOutputs();
         static GstFlowReturn processAppSinkNewRawSample(GstElement* appsink,
-            RawOutputPort* out_port);
+            BoundRawOutput* binding);
         void processRawInputs();
         void pushRawData(GstElement& appsrc, std::vector<std::uint8_t> const& data);
         virtual void waitForInitialData(base::Time const& deadline) override;
+        virtual void processInputs() override;
         void waitFirstRawData(base::Time const& deadline);
 
         /*
@@ -72,8 +76,8 @@ namespace gstreamer {
          * The second has ElementPortBinding elements, used for exchanging data between
          * the in/out ports and the pipeline
          */
-        template <typename T, bool input>
-        std::pair<std::vector<DynamicPort>, std::vector<ElementPortBinding<T>>>
+        template <template <typename> class Port, typename T, bool input>
+        std::pair<std::vector<DynamicPort>, std::vector<ElementPortBinding<Port, T>>>
         validatePortsWithElements(GstElement& pipeline,
             std::vector<std::string> const& port_names);
 
