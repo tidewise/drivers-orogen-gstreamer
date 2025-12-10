@@ -102,7 +102,7 @@ namespace gstreamer {
          *
          * @return true if the transition can continue, false otherwise
          */
-        bool configureHook();
+        bool configureHook() override;
 
         /**
          * Hook called when the state machine transition from Stopped to Running
@@ -112,7 +112,7 @@ namespace gstreamer {
          *
          * @return true if the transition is successful, false otherwise
          */
-        bool startHook();
+        bool startHook() override;
 
         /**
          * Hook called on trigger in the Running state
@@ -127,7 +127,7 @@ namespace gstreamer {
          * allow to get into the associated RunTimeError, Exception and
          * FatalError states.
          */
-        void updateHook();
+        void updateHook() override;
 
         /**
          * Hook called in the RuntimeError state, under the same conditions than
@@ -135,7 +135,7 @@ namespace gstreamer {
          *
          * Call recover() to go back in the Runtime state.
          */
-        void errorHook();
+        void errorHook() override;
 
         /**
          * Hook called when the component transitions out of the Running state
@@ -143,7 +143,7 @@ namespace gstreamer {
          * This is called for any transition out of running, that is the
          * transitions to Stopped, Exception and Fatal
          */
-        void stopHook();
+        void stopHook() override;
 
         /**
          * Hook called on all transitions to PreOperational
@@ -151,7 +151,7 @@ namespace gstreamer {
          * This is called for all transitions into PreOperational, that is
          * either from Stopped or Exception
          */
-        void cleanupHook();
+        void cleanupHook() override;
     };
 }
 
