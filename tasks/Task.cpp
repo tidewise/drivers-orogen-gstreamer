@@ -276,13 +276,22 @@ void Task::processRawInputs()
 
 void Task::pushRawData(GstElement& appsrc, vector<std::uint8_t> const& data)
 {
-    GstUnrefGuard buffer(gst_buffer_new_and_alloc(data.size()));
-    gst_buffer_fill(buffer.get(), 0, data.data(), data.size());
-    GstFlowReturn ret;
-    g_signal_emit_by_name(&appsrc, "push-buffer", buffer.get(), &ret);
+    size_t pushed{0};
+    while (pushed < data.size()) {
+        GstUnrefGuard buffer(gst_buffer_new_and_alloc(data.size()));
+        if (!buffer.get()) {
+            continue;
+        }
 
-    if (ret != GST_FLOW_OK) {
-        throw runtime_error("failed to push raw data to buffer");
+        size_t n =
+            gst_buffer_fill(buffer.get(), 0, data.data() + pushed, data.size() - pushed);
+        GstFlowReturn ret;
+        g_signal_emit_by_name(&appsrc, "push-buffer", buffer.get(), &ret);
+
+        if (ret != GST_FLOW_OK) {
+            throw runtime_error("failed to push raw data to buffer");
+        }
+        pushed += n;
     }
 }
 
