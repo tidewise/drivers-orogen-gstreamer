@@ -249,7 +249,7 @@ void Task::waitFirstRawData(base::Time const& deadline)
     }
 
     for (auto& binding : m_bound_raw_in) {
-        pushRawData(*binding.app_element, binding.memory.data);
+        pushRawData(*binding.app_element, binding.memory.data, GST_CLOCK_TIME_NONE);
     }
 }
 
@@ -269,12 +269,18 @@ void Task::processRawInputs()
     for (auto& binding : m_bound_raw_in) {
         GstElement* appsrc = binding.app_element;
         while (binding.port->read(binding.memory, false) == RTT::NewData) {
-            pushRawData(*appsrc, binding.memory.data);
+            GstClockTime pipeline_running_time{
+                gst_element_get_current_running_time(m_pipeline)};
+            // live sources must be timestamped with the pipeline running time. See
+            // gstreamer.freedesktop.org/documentation/additional/design/live-source.html?gi-language=c#timestamps
+            pushRawData(*appsrc, binding.memory.data, pipeline_running_time);
         }
     }
 }
 
-void Task::pushRawData(GstElement& appsrc, vector<std::uint8_t> const& data)
+void Task::pushRawData(GstElement& appsrc,
+    vector<std::uint8_t> const& data,
+    GstClockTime const& timestamp)
 {
     size_t pushed{0};
     while (pushed < data.size()) {
@@ -285,6 +291,7 @@ void Task::pushRawData(GstElement& appsrc, vector<std::uint8_t> const& data)
 
         size_t n =
             gst_buffer_fill(buffer.get(), 0, data.data() + pushed, data.size() - pushed);
+        GST_BUFFER_TIMESTAMP(buffer.get()) = timestamp;
         GstFlowReturn ret;
         g_signal_emit_by_name(&appsrc, "push-buffer", buffer.get(), &ret);
 
