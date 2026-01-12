@@ -3,7 +3,6 @@
 #ifndef GSTREAMER_TASK_TASK_HPP
 #define GSTREAMER_TASK_TASK_HPP
 
-#include "Helpers.hpp"
 
 #include "gst/gstelement.h"
 #include "gstreamer/TaskBase.hpp"

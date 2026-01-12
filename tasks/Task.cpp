@@ -2,6 +2,7 @@
 
 #include <gst/gstcaps.h>
 
+#include "Helpers.hpp"
 #include "Task.hpp"
 
 #include <chrono>
@@ -49,6 +50,9 @@ bool Task::configureHook()
     }
 
     configureRawIO(*pipeline);
+    gst_debug_bin_to_dot_file_with_ts(GST_BIN(pipeline),
+        GST_DEBUG_GRAPH_SHOW_VERBOSE,
+        getName().c_str());
 
     m_pipeline = unref_guard.release();
     return true;
@@ -219,6 +223,11 @@ bool Task::startHook()
         return false;
 
     startPipeline();
+
+    gst_debug_bin_to_dot_file_with_ts(GST_BIN(m_pipeline),
+        GST_DEBUG_GRAPH_SHOW_VERBOSE,
+        getName().c_str());
+
     return true;
 }
 
