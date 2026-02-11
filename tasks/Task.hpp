@@ -3,7 +3,7 @@
 #ifndef GSTREAMER_TASK_TASK_HPP
 #define GSTREAMER_TASK_TASK_HPP
 
-
+#include "Helpers.hpp"
 #include "gst/gstelement.h"
 #include "gstreamer/TaskBase.hpp"
 #include "iodrivers_base/RawPacket.hpp"
@@ -56,8 +56,14 @@ namespace gstreamer {
 
         void configureRawIO(GstElement& pipeline);
         void setupRawOutputs();
-        static GstFlowReturn processAppSinkNewRawSample(GstElement* appsink,
-            BoundRawOutput* binding);
+        static GstFlowReturn processAppSinkNewRawSample(GstAppSink* appsink,
+            void* binding);
+        static GstFlowReturn processAppSinkNewRawPreroll(GstAppSink* appsink,
+            void* binding);
+        static GstFlowReturn processAppSinkNewPrerollSample(GstAppSink* appsink,
+            void* binding);
+        static GstFlowReturn writeRawOutput(BoundRawOutput& binding,
+            GstUnrefGuard<GstSample>& sample);
         void processRawInputs();
         void pushRawData(GstElement& appsrc, std::vector<std::uint8_t> const& data);
         virtual void waitForInitialData(base::Time const& deadline) override;

@@ -110,7 +110,7 @@ namespace gstreamer {
         virtual void destroyPipeline();
 
         static GstFlowReturn sourcePushSample(GstElement* sink, ConfiguredOutput** data);
-        static GstFlowReturn sinkNewSample(GstElement* sink, ConfiguredOutput* data);
+        static GstFlowReturn sinkNewSample(GstAppSink* sink, void* _data);
         static bool sinkRawFrame(
             GstMapInfo& map_info,
             GstVideoInfo& video_info,

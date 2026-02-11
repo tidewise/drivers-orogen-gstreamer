@@ -2,7 +2,6 @@
 
 #include <gst/gstcaps.h>
 
-#include "Helpers.hpp"
 #include "Task.hpp"
 
 #include <chrono>
@@ -120,42 +119,65 @@ GstElement* fetchElement(GstElement& pipeline, string const& name)
 
 void Task::setupRawOutputs()
 {
+    GstAppSinkCallbacks callbacks;
+    callbacks.new_event = nullptr;
+    callbacks.eos = nullptr;
+    callbacks.new_sample = processAppSinkNewRawSample;
+    callbacks.new_preroll = nullptr;
     for (auto& bound_out : m_bound_raw_out) {
-        g_object_set(bound_out.app_element, "emit-signals", TRUE, NULL);
-        g_signal_connect(bound_out.app_element,
-            "new-sample",
-            G_CALLBACK(processAppSinkNewRawSample),
-            &bound_out);
+        gst_app_sink_set_callbacks(GST_APP_SINK(bound_out.app_element),
+            &callbacks,
+            &bound_out,
+            nullptr);
     }
 }
 
-GstFlowReturn Task::processAppSinkNewRawSample(GstElement* appsink,
-    BoundRawOutput* binding)
+GstFlowReturn Task::writeRawOutput(BoundRawOutput& binding,
+    GstUnrefGuard<GstSample>& sample)
 {
-    // pull sample -> retrieve the buffer -> map the buffer
-    GstUnrefGuard sample(gst_app_sink_pull_sample(GST_APP_SINK(appsink)));
-
     // buffer should not be unrefered when returned from gst_sample_get_buffer
     GstBuffer* buffer{gst_sample_get_buffer(sample.get())};
     if (buffer == NULL) {
-        return GST_FLOW_OK;
+        return GST_FLOW_EOS;
     }
 
     GstUnrefGuard memory(gst_buffer_get_memory(buffer, 0));
     GstMapInfo map_info = GST_MAP_INFO_INIT;
     if (!gst_memory_map(memory.get(), &map_info, GST_MAP_READ)) {
-        return GST_FLOW_OK;
+        return GST_FLOW_ERROR;
     }
     GstMemoryUnmapGuard memory_map(memory.get(), map_info);
 
-    RawPacket& out = binding->memory;
+    RawPacket& out = binding.memory;
     out.data.resize(map_info.size);
     copy(map_info.data, map_info.data + map_info.size, out.data.begin());
     // TODO: take the buffer timestamp (if it is there)
     out.time = base::Time::now();
-    binding->port->write(out);
+    binding.port->write(out);
 
     return GST_FLOW_OK;
+}
+
+GstFlowReturn Task::processAppSinkNewRawSample(GstAppSink* appsink, void* binding)
+{
+    if (binding == nullptr) {
+        return GST_FLOW_ERROR;
+    }
+    // pull sample -> retrieve the buffer -> map the buffer
+    GstUnrefGuard sample(gst_app_sink_pull_sample(appsink));
+    BoundRawOutput* port_binding = (BoundRawOutput*)binding;
+    return writeRawOutput(*port_binding, sample);
+}
+
+GstFlowReturn Task::processAppSinkNewPrerollSample(GstAppSink* appsink, void* binding)
+{
+    if (binding == nullptr) {
+        return GST_FLOW_ERROR;
+    }
+    // pull sample -> retrieve the buffer -> map the buffer
+    GstUnrefGuard sample(gst_app_sink_pull_preroll(appsink));
+    BoundRawOutput* port_binding = (BoundRawOutput*)binding;
+    return writeRawOutput(*port_binding, sample);
 }
 
 void movePortsToRegistry(vector<Common::DynamicPort>& ports,

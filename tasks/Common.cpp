@@ -150,10 +150,15 @@ void Common::configureOutput(GstElement* pipeline,
     m_configured_outputs.push_back(ConfiguredOutput(*this, port, frame_mode));
 
     port.setDataSample(m_configured_outputs.back().frame);
-    g_signal_connect(appsink,
-        "new-sample",
-        G_CALLBACK(sinkNewSample),
-        &m_configured_outputs.back());
+    GstAppSinkCallbacks callbacks;
+    callbacks.new_sample = sinkNewSample;
+    callbacks.eos = nullptr;
+    callbacks.new_event = nullptr;
+    callbacks.new_preroll = nullptr;
+    gst_app_sink_set_callbacks(GST_APP_SINK(appsink),
+        &callbacks,
+        &m_configured_outputs.back(),
+        nullptr);
 }
 
 void Common::configureInput(GstElement* pipeline,
@@ -184,7 +189,8 @@ void Common::waitFirstFrames(base::Time const& deadline)
     while (!all) {
         all = true;
         for (auto& configured_input : m_configured_inputs) {
-            if (configured_input.port->read(configured_input.frame, false) == RTT::NoData) {
+            if (configured_input.port->read(configured_input.frame, false) ==
+                RTT::NoData) {
                 all = false;
                 continue;
             }
@@ -230,7 +236,8 @@ void Common::processInputs()
 void Common::processFrameInputs()
 {
     for (auto& configured_input : m_configured_inputs) {
-        while (configured_input.port->read(configured_input.frame, false) == RTT::NewData) {
+        while (
+            configured_input.port->read(configured_input.frame, false) == RTT::NewData) {
             Frame const& frame = *configured_input.frame;
             if (frame.frame_mode != configured_input.frame_mode ||
                 frame.size.width != configured_input.width ||
@@ -294,10 +301,10 @@ void Common::pushRawFrame(GstElement* element, GstVideoInfo& info, Frame const& 
     }
 }
 
-GstFlowReturn Common::sinkNewSample(GstElement* sink, Common::ConfiguredOutput* data)
+GstFlowReturn Common::sinkNewSample(GstAppSink* sink, void* _data)
 {
     /* Retrieve the buffer */
-    GstSample* sample = gst_app_sink_pull_sample(GST_APP_SINK(sink));
+    GstSample* sample = gst_app_sink_pull_sample(sink);
     GstUnrefGuard<GstSample> sample_unref_guard(sample);
 
     /* If we have a new sample we have to send it to our Rock frame */
@@ -320,7 +327,7 @@ GstFlowReturn Common::sinkNewSample(GstElement* sink, Common::ConfiguredOutput* 
         return GST_FLOW_OK;
     }
     GstMemoryUnmapGuard memory_unmap_guard(memory, map_info);
-
+    Common::ConfiguredOutput* data = (Common::ConfiguredOutput*) _data;
     std::unique_ptr<Frame> frame(data->frame.try_write_access());
     if (!frame) {
         frame.reset(new base::samples::frame::Frame());
