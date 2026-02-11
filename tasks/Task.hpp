@@ -9,6 +9,7 @@
 #include "gstreamer/TaskBase.hpp"
 #include "iodrivers_base/RawPacket.hpp"
 
+#include <cstdint>
 #include <gst/app/gstappsink.h>
 #include <gst/app/gstappsrc.h>
 #include <gst/video/video-info.h>
