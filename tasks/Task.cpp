@@ -54,6 +54,9 @@ bool Task::configureHook()
         GST_DEBUG_GRAPH_SHOW_VERBOSE,
         getName().c_str());
 
+    GstUnrefGuard<GstBus> bus(gst_pipeline_get_bus(GST_PIPELINE(pipeline)));
+    m_bus_watch_id = gst_bus_add_watch(bus.get(), busWatchCallback, pipeline);
+
     m_pipeline = unref_guard.release();
     return true;
 }
@@ -307,6 +310,7 @@ void Task::stopHook()
 void Task::cleanupHook()
 {
     destroyPipeline();
+    g_source_remove(m_bus_watch_id);
 
     TaskBase::cleanupHook();
 }

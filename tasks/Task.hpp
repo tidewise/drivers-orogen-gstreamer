@@ -49,6 +49,7 @@ namespace gstreamer {
     protected:
         std::vector<BoundRawInput> m_bound_raw_in;
         std::vector<BoundRawOutput> m_bound_raw_out;
+        guint m_bus_watch_id;
         GstElement* constructPipeline();
 
         std::vector<DynamicPort> configureInputs(GstElement* pipeline);

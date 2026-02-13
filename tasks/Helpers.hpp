@@ -25,6 +25,7 @@ namespace gstreamer {
     ROCK_GSTREAMER_UNREF(GstMemory, gst_memory_unref);
     ROCK_GSTREAMER_UNREF(GstVideoFrame, gst_video_frame_unmap);
     ROCK_GSTREAMER_UNREF(GstPad, gst_object_unref);
+    ROCK_GSTREAMER_UNREF(GstBus, gst_object_unref);
 
     template <typename T> struct GstUnrefGuard {
         T* object;
@@ -173,6 +174,11 @@ namespace gstreamer {
             return rawModeToGSTCaps(frame_mode);
         }
     }
+
+    // Callback function for handling pipeline bus messages.
+    //
+    // It stops receiving messages for good once it returns FALSE
+    gboolean busWatchCallback(GstBus* bus, GstMessage* msg, gpointer pipeline);
 }
 
 #endif
