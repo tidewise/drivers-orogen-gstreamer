@@ -1,7 +1,7 @@
 #ifndef GSTREAMER_RTPTASK_TASK_HPP
 #define GSTREAMER_RTPTASK_TASK_HPP
 
-#include "gst/rtp/rtp.h"
+#include "Helpers.hpp"
 #include "gstreamer/RTPTaskBase.hpp"
 #include <base/Float.hpp>
 
@@ -52,10 +52,8 @@ namespace gstreamer {
 
         /** RTP Monitored Settings */
         RTPMonitoringConfig m_rtp_monitoring_config;
-        /** RTP bin element */
-        GstElement* m_bin;
         /** RTP sessions element */
-        std::vector<GstElement*> m_rtp_sessions;
+        std::vector<GstUnrefGuard<GstElement>> m_rtp_sessions;
 
         /**
          * Hook called when the state machine transitions from PreOperational to

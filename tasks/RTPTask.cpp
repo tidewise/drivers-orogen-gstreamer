@@ -72,21 +72,27 @@ bool RTPTask::configureHook()
         return false;
 
     m_rtp_monitoring_config = _rtp_monitoring_config.get();
-    m_bin = gst_bin_get_by_name(GST_BIN(m_pipeline),
-        m_rtp_monitoring_config.rtpbin_name.c_str());
-    if (!m_bin) {
+    GstUnrefGuard<GstElement> bin(gst_bin_get_by_name(GST_BIN(m_pipeline),
+        m_rtp_monitoring_config.rtpbin_name.c_str()));
+    if (!bin.get()) {
         throw std::runtime_error("cannot find element named " +
                                  m_rtp_monitoring_config.rtpbin_name + " in pipeline");
     }
 
-    // Free previous session variables.
-    // This cannot be done on stop hook since it
-    // will make tasks die unexpectedly on process server
-    for (auto const& internal_session : m_rtp_sessions) {
-        g_free(internal_session);
+    std::vector<GstUnrefGuard<GstElement>> sessions;
+    sessions.reserve(m_rtp_monitoring_config.sessions_id.size());
+    for (uint32_t session_id : m_rtp_monitoring_config.sessions_id) {
+        GstElement* session{nullptr};
+        g_signal_emit_by_name(bin.get(), "get-session", session_id, &session);
+        if (!session) {
+            throw std::runtime_error(
+                "did not resolve provided session, wrong session ID " +
+                to_string(session_id) + " ?");
+        }
+        sessions.emplace_back(session);
     }
-    // "Clear" m_rtp_sessions
-    m_rtp_sessions.clear();
+
+    m_rtp_sessions = std::move(sessions);
 
     return true;
 }
@@ -96,22 +102,6 @@ bool RTPTask::startHook()
     if (!RTPTaskBase::startHook())
         return false;
 
-    std::vector<GstElement*> sessions;
-    for (uint32_t session_id : m_rtp_monitoring_config.sessions_id) {
-        GstElement* session = nullptr;
-        g_signal_emit_by_name(m_bin,
-            "get-session",
-            session_id,
-            &session);
-        if (!session) {
-            throw std::runtime_error(
-                "did not resolve provided session, wrong session ID " +
-                to_string(session_id) + " ?");
-        }
-        sessions.push_back(session);
-    }
-
-    m_rtp_sessions = sessions;
     return true;
 }
 
@@ -120,9 +110,10 @@ void RTPTask::updateHook()
     RTPTaskBase::updateHook();
 
     RTPStatistics stats;
+    stats.statistics.reserve(m_rtp_sessions.size());
     stats.time = base::Time::now();
-    for (auto const& element : m_rtp_sessions) {
-        stats.statistics.push_back(updateRTPSessionStats(element));
+    for (auto& element : m_rtp_sessions) {
+        stats.statistics.push_back(updateRTPSessionStats(element.get()));
     }
     _rtp_statistics.write(stats);
 }
@@ -138,4 +129,5 @@ void RTPTask::stopHook()
 void RTPTask::cleanupHook()
 {
     RTPTaskBase::cleanupHook();
+    m_rtp_sessions.clear();
 }
