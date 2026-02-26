@@ -22,6 +22,14 @@ describe OroGen.gstreamer.RTPTask do
         end
     end
 
+    it "does not raise on re-configuration cycle" do
+        m = rtp_sender_m(@rtp_port)
+        sender = syskit_deploy_configure_and_start(m)
+        sender.needs_reconfiguration!
+        syskit_stop(sender)
+        syskit_deploy_configure_and_start(m)
+    end
+
     def rtp_sender_m(port)
         OroGen.gstreamer.RTPTask
               .with_arguments(

@@ -36,6 +36,22 @@ namespace gstreamer {
             , unref(unref)
         {
         }
+
+        GstUnrefGuard(GstUnrefGuard&& other)
+        {
+            this->object = other.release();
+            this->unref = other.unref;
+        }
+
+        GstUnrefGuard(GstUnrefGuard const&) = delete;
+        GstUnrefGuard& operator=(GstUnrefGuard const&) = delete;
+
+        GstUnrefGuard& operator=(GstUnrefGuard&& other) {
+            this->object = other.release();
+            this->unref = other.unref;
+            return *this;
+        }
+
         ~GstUnrefGuard()
         {
             if (object) {
@@ -139,8 +155,7 @@ namespace gstreamer {
 
     inline GstCaps* jpegModeToGSTCaps(base::samples::frame::frame_mode_t frame_mode)
     {
-        GstCaps* caps =
-            gst_caps_new_empty_simple("image/jpeg");
+        GstCaps* caps = gst_caps_new_empty_simple("image/jpeg");
         if (!caps) {
             throw std::runtime_error("failed to generate caps");
         }

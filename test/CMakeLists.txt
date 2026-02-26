@@ -1,5 +1,6 @@
 rock_gtest(test_suite suite.cpp
             test_RTPHelpers.cpp
+            test_Helpers.cpp
     SOURCES ../tasks/RTPHelpers.cpp
     HEADERS ../tasks/RTPHelpers.hpp
     DEPS_PKGCONFIG gstreamer-1.0
