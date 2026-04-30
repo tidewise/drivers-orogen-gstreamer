@@ -1,5 +1,6 @@
 /* Generated from orogen/lib/orogen/templates/tasks/Task.cpp */
 
+#include <base-logging/Logging.hpp>
 #include <gst/gstcaps.h>
 
 #include "Helpers.hpp"
@@ -132,7 +133,6 @@ void Task::setupRawOutputs()
 GstFlowReturn Task::processAppSinkNewRawSample(GstElement* appsink,
     BoundRawOutput* binding)
 {
-    // pull sample -> retrieve the buffer -> map the buffer
     GstUnrefGuard sample(gst_app_sink_pull_sample(GST_APP_SINK(appsink)));
 
     // buffer should not be unrefered when returned from gst_sample_get_buffer
@@ -141,17 +141,17 @@ GstFlowReturn Task::processAppSinkNewRawSample(GstElement* appsink,
         return GST_FLOW_OK;
     }
 
-    GstUnrefGuard memory(gst_buffer_get_memory(buffer, 0));
-    GstMapInfo map_info = GST_MAP_INFO_INIT;
-    if (!gst_memory_map(memory.get(), &map_info, GST_MAP_READ)) {
-        return GST_FLOW_OK;
-    }
-    GstMemoryUnmapGuard memory_map(memory.get(), map_info);
-
+    gsize offset, maxsize;
     RawPacket& out = binding->memory;
-    out.data.resize(map_info.size);
-    copy(map_info.data, map_info.data + map_info.size, out.data.begin());
-    // TODO: take the buffer timestamp (if it is there)
+    out.data.resize(gst_buffer_get_sizes(buffer, &offset, &maxsize));
+    gsize effective_size =
+        gst_buffer_extract(buffer, 0, out.data.data(), out.data.size());
+    if (effective_size != out.data.size()) {
+        LOG_WARN_S << "extracted bytes size (" << effective_size
+                   << ") differs from the buffer size (" << out.data.size() << ")";
+    }
+
+    out.data.resize(effective_size);
     out.time = base::Time::now();
     binding->port->write(out);
 
