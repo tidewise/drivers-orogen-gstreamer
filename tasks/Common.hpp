@@ -56,6 +56,11 @@ namespace gstreamer {
             RTT::base::PortInterface* release() noexcept;
         };
 
+    private:
+        std::atomic<bool> m_gstreamer_error{false};
+        void attachErrorCallback();
+        static void errorCallback(GstBus *bus, GstMessage *msg, Common* self);
+
     protected:
         typedef base::samples::frame::Frame Frame;
         typedef RTT::extras::ReadOnlyPointer<Frame> ROPtrFrame;

@@ -4,6 +4,7 @@
 #include "Helpers.hpp"
 
 #include <chrono>
+#include <gst/gst.h>
 #include <thread>
 
 using namespace gstreamer;
@@ -37,11 +38,45 @@ bool Common::startHook()
         return false;
 
     m_error_queue.clear();
+    m_gstreamer_error = false;
+    attachErrorCallback();
     return true;
 }
+void Common::attachErrorCallback()
+{
+    if (!m_pipeline) {
+        return;
+    }
+    GstUnrefGuard bus(gst_element_get_bus(m_pipeline));
+    gst_bus_add_signal_watch(bus.get());
+    g_signal_connect(G_OBJECT(bus.get()),
+        "message::error",
+        G_CALLBACK(Common::errorCallback),
+        this);
+}
+
+void Common::errorCallback(GstBus* bus, GstMessage* msg, Common* self)
+{
+    GError* error{nullptr};
+    gchar* debug_info{nullptr};
+    gst_message_parse_error(msg, &error, &debug_info);
+    g_printerr("Error received from element %s: %s\n",
+        GST_OBJECT_NAME(msg->src),
+        error->message);
+    g_printerr("Debugging information: %s\n", debug_info ? debug_info : "none");
+    g_clear_error(&error);
+    g_free(debug_info);
+
+    self->m_gstreamer_error = true;
+}
+
 void Common::updateHook()
 {
     CommonBase::updateHook();
+
+    if (m_gstreamer_error) {
+        return exception(GSTREAMER_ERROR);
+    }
 
     if (!m_pipeline) {
         return;
