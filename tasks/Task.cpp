@@ -6,6 +6,8 @@
 #include "Helpers.hpp"
 #include "Task.hpp"
 
+#include <gstreamer/memory.hpp>
+
 #include <chrono>
 #include <thread>
 
@@ -55,7 +57,8 @@ bool Task::configureHook()
         GST_DEBUG_GRAPH_SHOW_VERBOSE,
         getName().c_str());
 
-    m_pipeline = unref_guard.release();
+    m_pipeline =
+        std::shared_ptr<GstElement>(unref_guard.release(), memory::PipelineDestructor());
     return true;
 }
 
@@ -224,7 +227,7 @@ bool Task::startHook()
 
     startPipeline();
 
-    gst_debug_bin_to_dot_file_with_ts(GST_BIN(m_pipeline),
+    gst_debug_bin_to_dot_file_with_ts(GST_BIN(m_pipeline.get()),
         GST_DEBUG_GRAPH_SHOW_VERBOSE,
         getName().c_str());
 
@@ -302,7 +305,7 @@ void Task::errorHook()
 void Task::stopHook()
 {
     TaskBase::stopHook();
-    gst_element_set_state(GST_ELEMENT(m_pipeline), GST_STATE_PAUSED);
+    gst_element_set_state(GST_ELEMENT(m_pipeline.get()), GST_STATE_PAUSED);
 }
 void Task::cleanupHook()
 {

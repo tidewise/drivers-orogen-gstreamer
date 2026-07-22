@@ -3,6 +3,7 @@
 #include "WebRTCReceiveTask.hpp"
 #include "Helpers.hpp"
 #include <base-logging/Logging.hpp>
+#include <gstreamer/memory.hpp>
 
 using namespace gstreamer;
 using namespace std;
@@ -33,7 +34,8 @@ bool WebRTCReceiveTask::configureHook()
 
     auto config = _signalling.get();
     if (!config.polite && !config.remote_peer_id.empty()) {
-        m_pipeline = createPipeline(config.remote_peer_id);
+        m_pipeline = std::shared_ptr<GstElement>(createPipeline(config.remote_peer_id),
+            memory::PipelineDestructor());
     }
     m_decode_queue_max_size_time = _decode_queue_max_size_time.get();
 
@@ -76,7 +78,8 @@ void WebRTCReceiveTask::processSignallingMessage(SignallingMessage const& messag
         if (m_pipeline) {
             destroyPipeline();
         }
-        m_pipeline = createPipeline(message.from);
+        m_pipeline = std::shared_ptr<GstElement>(createPipeline(message.from),
+            memory::PipelineDestructor());
         startPipeline();
         return;
     }
@@ -90,7 +93,8 @@ void WebRTCReceiveTask::processSignallingMessage(SignallingMessage const& messag
         if (m_pipeline) {
             destroyPipeline();
         }
-        m_pipeline = createPipeline(message.from);
+        m_pipeline = std::shared_ptr<GstElement>(createPipeline(message.from),
+            memory::PipelineDestructor());
         startPipeline();
     }
 
@@ -218,7 +222,7 @@ void WebRTCReceiveTask::onIncomingStream(GstElement* webrtcbin, GstPad* pad)
 
     auto const& peer = m_peers[webrtcbin];
     GstElement* bin = gst_bin_new((peer.peer_id + "_receivebin").c_str());
-    gst_bin_add(GST_BIN(m_pipeline), bin);
+    gst_bin_add(GST_BIN(m_pipeline.get()), bin);
 
     GstElement* q = gst_element_factory_make("queue", NULL);
     GstElement* decodebin = gst_element_factory_make("decodebin", NULL);
