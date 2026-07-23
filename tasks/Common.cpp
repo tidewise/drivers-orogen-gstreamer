@@ -29,12 +29,27 @@ bool Common::configureHook()
         return false;
 
     m_dynamic_ports.clear();
+    m_logged_playing_pipeline = false;
     return true;
 }
+
+std::string Common::pipelineDotFileName() const
+{
+    return getName() + "-" + std::to_string(getpid()) + "-" +
+           base::Time::now().toString();
+}
+
 bool Common::startHook()
 {
     if (!CommonBase::startHook())
         return false;
+
+    if (m_pipeline) {
+        // log pipeline dot file after all specializations configureHook
+        gst_debug_bin_to_dot_file(GST_BIN(m_pipeline.get()),
+            GST_DEBUG_GRAPH_SHOW_VERBOSE,
+            pipelineDotFileName().c_str());
+    }
 
     m_error_queue.clear();
     return true;
@@ -51,6 +66,14 @@ void Common::updateHook()
     gst_element_get_state(GST_ELEMENT(m_pipeline.get()), &state, nullptr, 0);
     if (state != GST_STATE_PLAYING) {
         return;
+    }
+
+    if (!m_logged_playing_pipeline) {
+        m_logged_playing_pipeline = true;
+        // log pipeline dot file after all specializations configureHook
+        gst_debug_bin_to_dot_file(GST_BIN(m_pipeline.get()),
+            GST_DEBUG_GRAPH_SHOW_VERBOSE,
+            pipelineDotFileName().c_str());
     }
 
     processInputs();

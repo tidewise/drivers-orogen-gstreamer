@@ -53,9 +53,6 @@ bool Task::configureHook()
     }
 
     configureRawIO(*pipeline);
-    gst_debug_bin_to_dot_file_with_ts(GST_BIN(pipeline),
-        GST_DEBUG_GRAPH_SHOW_VERBOSE,
-        getName().c_str());
 
     m_pipeline =
         std::shared_ptr<GstElement>(unref_guard.release(), memory::PipelineDestructor());
@@ -226,10 +223,6 @@ bool Task::startHook()
         return false;
 
     startPipeline();
-
-    gst_debug_bin_to_dot_file_with_ts(GST_BIN(m_pipeline.get()),
-        GST_DEBUG_GRAPH_SHOW_VERBOSE,
-        getName().c_str());
 
     return true;
 }

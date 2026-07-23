@@ -128,6 +128,9 @@ namespace gstreamer {
         void pushCompressedFrame(GstElement* element, Frame const& frame);
         std::vector<DynamicPort> m_dynamic_ports;
 
+        bool m_logged_playing_pipeline{false};
+        std::string pipelineDotFileName() const;
+
     public:
         /** TaskContext constructor for Common
          * \param name Name of the task. This name needs to be unique to make it
