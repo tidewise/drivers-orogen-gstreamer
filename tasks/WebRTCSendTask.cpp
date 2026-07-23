@@ -6,6 +6,7 @@
 #include <base-logging/Logging.hpp>
 
 using namespace gstreamer;
+using namespace gstreamer::memory;
 using namespace std;
 using namespace webrtc_base;
 

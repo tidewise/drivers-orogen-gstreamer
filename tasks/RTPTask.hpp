@@ -4,6 +4,7 @@
 #include "Helpers.hpp"
 #include "gstreamer/RTPTaskBase.hpp"
 #include <base/Float.hpp>
+#include <gstreamer/memory.hpp>
 
 namespace gstreamer {
     /*! \class RTPTask
@@ -53,7 +54,7 @@ namespace gstreamer {
         /** RTP Monitored Settings */
         RTPMonitoringConfig m_rtp_monitoring_config;
         /** RTP sessions element */
-        std::vector<GstUnrefGuard<GstElement>> m_rtp_sessions;
+        std::vector<memory::GstUnrefGuard<GstElement>> m_rtp_sessions;
 
         /**
          * Hook called when the state machine transitions from PreOperational to

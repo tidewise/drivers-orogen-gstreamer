@@ -3,10 +3,13 @@
 #include "Common.hpp"
 #include "Helpers.hpp"
 
+#include <gstreamer/memory.hpp>
+
 #include <chrono>
 #include <thread>
 
 using namespace gstreamer;
+using namespace gstreamer::memory;
 using namespace std;
 
 Common::Common(std::string const& name)

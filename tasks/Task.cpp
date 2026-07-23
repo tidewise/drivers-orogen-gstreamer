@@ -13,6 +13,7 @@
 
 using namespace std;
 using namespace gstreamer;
+using namespace gstreamer::memory;
 using namespace base::samples::frame;
 using iodrivers_base::RawPacket;
 
