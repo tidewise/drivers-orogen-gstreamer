@@ -29,7 +29,7 @@ namespace gstreamer {
         friend class WebRTCSendTaskBase;
 
     protected:
-        GstElement* createPipeline();
+        GstBin* createPipeline();
         void disconnectPeer(PeerMap::iterator peer_it);
         void configurePeer(std::string const& peer_id);
         void destroyPipeline() override;

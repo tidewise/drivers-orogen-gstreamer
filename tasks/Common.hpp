@@ -88,7 +88,7 @@ namespace gstreamer {
         std::list<ConfiguredInput> m_configured_inputs;
         std::list<ConfiguredOutput> m_configured_outputs;
 
-        std::shared_ptr<GstElement> m_pipeline;
+        std::shared_ptr<GstBin> m_pipeline;
 
         void configureOutput(GstElement* pipeline,
             std::string const& appsink_name,

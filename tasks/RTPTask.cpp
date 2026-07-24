@@ -73,11 +73,12 @@ bool RTPTask::configureHook()
         return false;
 
     m_rtp_monitoring_config = _rtp_monitoring_config.get();
-    GstUnrefGuard<GstElement> bin(gst_bin_get_by_name(GST_BIN(m_pipeline.get()),
-        m_rtp_monitoring_config.rtpbin_name.c_str()));
+    std::string& rtpbin_name{m_rtp_monitoring_config.rtpbin_name};
+    GstUnrefGuard<GstElement> bin(
+        gst_bin_get_by_name(m_pipeline.get(), rtpbin_name.c_str()));
     if (!bin.get()) {
-        throw std::runtime_error("cannot find element named " +
-                                 m_rtp_monitoring_config.rtpbin_name + " in pipeline");
+        throw std::runtime_error(
+            "cannot find element named " + rtpbin_name + " in pipeline");
     }
 
     std::vector<GstUnrefGuard<GstElement>> sessions;

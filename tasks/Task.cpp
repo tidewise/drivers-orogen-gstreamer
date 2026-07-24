@@ -55,8 +55,8 @@ bool Task::configureHook()
 
     configureRawIO(*pipeline);
 
-    m_pipeline =
-        std::shared_ptr<GstElement>(unref_guard.release(), memory::PipelineDestructor());
+    m_pipeline = std::shared_ptr<GstBin>(GST_BIN(unref_guard.release()),
+        memory::PipelineDestructor());
     return true;
 }
 

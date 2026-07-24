@@ -35,7 +35,7 @@ bool WebRTCSendTask::configureHook()
     }
 
     m_pipeline =
-        std::shared_ptr<GstElement>(createPipeline(), memory::PipelineDestructor());
+        std::shared_ptr<GstBin>(createPipeline(), memory::PipelineDestructor());
     return true;
 }
 bool WebRTCSendTask::startHook()
@@ -116,7 +116,7 @@ void WebRTCSendTask::stopHook()
     }
 
     WebRTCSendTaskBase::stopHook();
-    gst_element_set_state(m_pipeline.get(), GST_STATE_PAUSED);
+    gst_element_set_state(GST_ELEMENT(m_pipeline.get()), GST_STATE_PAUSED);
 }
 
 void WebRTCSendTask::cleanupHook()
@@ -125,7 +125,7 @@ void WebRTCSendTask::cleanupHook()
     WebRTCSendTaskBase::cleanupHook();
 }
 
-GstElement* WebRTCSendTask::createPipeline()
+GstBin* WebRTCSendTask::createPipeline()
 {
     string pipeline_definition = "appsrc format=3 do-timestamp=TRUE "
                                  "is-live=true name=src !" +
@@ -141,7 +141,7 @@ GstElement* WebRTCSendTask::createPipeline()
     }
 
     configureInput(pipeline, "src", false, _video_in);
-    return pipeline;
+    return GST_BIN(pipeline);
 }
 
 void WebRTCSendTask::configurePeer(string const& peer_id)
@@ -154,10 +154,10 @@ void WebRTCSendTask::configurePeer(string const& peer_id)
     GstUnrefGuard<GstPad> queue_sink(gst_element_get_static_pad(queue, "sink"));
     auto pad = gst_ghost_pad_new("sink", queue_sink.get());
     gst_element_add_pad(bin, pad);
-    gst_bin_add(GST_BIN(m_pipeline.get()), bin);
+    gst_bin_add(m_pipeline.get(), bin);
 
     GstUnrefGuard<GstElement> splitter(
-        gst_bin_get_by_name(GST_BIN(m_pipeline.get()), "splitter"));
+        gst_bin_get_by_name(m_pipeline.get(), "splitter"));
 #if GST_CHECK_VERSION(1, 20, 0)
     GstUnrefGuard<GstPad> srcpad(
         gst_element_request_pad_simple(splitter.get(), "src_%u"));
@@ -200,9 +200,9 @@ void WebRTCSendTask::disconnectPeer(PeerMap::iterator peer_it)
 
     gst_element_set_state(elements.bin, GST_STATE_NULL);
     GstUnrefGuard<GstElement> splitter(
-        gst_bin_get_by_name(GST_BIN(m_pipeline.get()), "splitter"));
+        gst_bin_get_by_name(m_pipeline.get(), "splitter"));
     gst_element_unlink_many(splitter.get(), elements.bin, nullptr);
-    gst_bin_remove_many(GST_BIN(m_pipeline.get()), elements.bin, nullptr);
+    gst_bin_remove_many(m_pipeline.get(), elements.bin, nullptr);
 
     gst_element_release_request_pad(splitter.get(), elements.tee_pad);
 }
