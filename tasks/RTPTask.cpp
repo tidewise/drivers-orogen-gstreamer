@@ -11,6 +11,7 @@
 using namespace std;
 using namespace gstreamer;
 using namespace gstreamer::memory;
+using namespace gstreamer::rtpbin;
 using namespace base::samples::frame;
 
 RTPTask::RTPTask(std::string const& name)
@@ -81,6 +82,13 @@ bool RTPTask::configureHook()
             "cannot find element named " + rtpbin_name + " in pipeline");
     }
 
+    auto receiver_mapping = _receiver_map.get();
+    if (!receiver_mapping.undefined()) {
+        receiver::Context ctx = {m_pipeline, receiver_mapping};
+        m_receiver_context = ctx;
+        receiver::setup(rtpbin_name, *m_receiver_context);
+    }
+
     std::vector<GstUnrefGuard<GstElement>> sessions;
     sessions.reserve(m_rtp_monitoring_config.sessions_id.size());
     for (uint32_t session_id : m_rtp_monitoring_config.sessions_id) {
@@ -131,5 +139,6 @@ void RTPTask::stopHook()
 void RTPTask::cleanupHook()
 {
     RTPTaskBase::cleanupHook();
+    m_receiver_context = std::nullopt;
     m_rtp_sessions.clear();
 }
