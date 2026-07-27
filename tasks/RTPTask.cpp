@@ -74,26 +74,13 @@ bool RTPTask::configureHook()
         return false;
 
     m_rtp_monitoring_config = _rtp_monitoring_config.get();
-    std::string& rtpbin_name{m_rtp_monitoring_config.rtpbin_name};
-    GstUnrefGuard<GstElement> bin(
-        gst_bin_get_by_name(m_pipeline.get(), rtpbin_name.c_str()));
-    if (!bin.get()) {
-        throw std::runtime_error(
-            "cannot find element named " + rtpbin_name + " in pipeline");
-    }
-
-    auto receiver_mapping = _receiver_map.get();
-    if (!receiver_mapping.undefined()) {
-        receiver::Context ctx = {m_pipeline, receiver_mapping};
-        m_receiver_context = ctx;
-        receiver::setup(rtpbin_name, *m_receiver_context);
-    }
+    auto rtpbin = pipelineConfigure();
 
     std::vector<GstUnrefGuard<GstElement>> sessions;
     sessions.reserve(m_rtp_monitoring_config.sessions_id.size());
     for (uint32_t session_id : m_rtp_monitoring_config.sessions_id) {
         GstElement* session{nullptr};
-        g_signal_emit_by_name(bin.get(), "get-session", session_id, &session);
+        g_signal_emit_by_name(rtpbin.get(), "get-session", session_id, &session);
         if (!session) {
             throw std::runtime_error(
                 "did not resolve provided session, wrong session ID " +
@@ -105,6 +92,55 @@ bool RTPTask::configureHook()
     m_rtp_sessions = std::move(sessions);
 
     return true;
+}
+
+GstUnrefGuard<GstElement> RTPTask::pipelineConfigure()
+{
+    std::string& rtpbin_name{m_rtp_monitoring_config.rtpbin_name};
+    GstUnrefGuard<GstElement> bin(
+        gst_bin_get_by_name(m_pipeline.get(), rtpbin_name.c_str()));
+    if (!bin.get()) {
+        throw std::runtime_error(
+            "cannot find element named " + rtpbin_name + " in pipeline");
+    }
+
+    auto receiver_mapping = _receiver_map.get();
+    auto sender_mapping = _sender_map.get();
+
+    uint8_t role{0};
+    if (!receiver_mapping.undefined()) {
+        role |= 0x1;
+        LOG_DEBUG_S << "receiver mappings defined" << std::endl;
+    }
+
+    if (!sender_mapping.undefined()) {
+        role |= 0x2;
+        LOG_DEBUG_S << "sender mappings defined" << std::endl;
+    }
+
+    if (!role) {
+        return bin;
+    }
+
+    switch (role) {
+        case 0x01: {
+            receiver::Context ctx = {m_pipeline, receiver_mapping};
+            m_receiver_context = ctx;
+        }
+            receiver::setup(rtpbin_name, *m_receiver_context);
+            break;
+        case 0x02: {
+            sender::Context ctx = {m_pipeline, sender_mapping};
+            m_sender_context = ctx;
+        }
+            sender::setup(rtpbin_name, *m_sender_context);
+            break;
+        default:
+            throw std::invalid_argument("The component can't be configured as sender "
+                                        "and receiver simultaneously.");
+    };
+
+    return bin;
 }
 
 bool RTPTask::startHook()
@@ -140,5 +176,6 @@ void RTPTask::cleanupHook()
 {
     RTPTaskBase::cleanupHook();
     m_receiver_context = std::nullopt;
+    m_sender_context = std::nullopt;
     m_rtp_sessions.clear();
 }

@@ -15,6 +15,7 @@ import_types_from "webrtc_base"
 import_types_from "iodrivers_base"
 import_types_from "tasks/RTPHelpers.hpp"
 import_types_from "gstreamer/rtpbin/receiver.hpp"
+import_types_from "gstreamer/rtpbin/sender.hpp"
 
 OroGen::Spec::Deployment.register_global_initializer(:gstreamer)
 if defined?(OroGen::Gen::RTT_CPP::Deployment)
@@ -79,6 +80,9 @@ task_context "RTPTask", subclasses: "Task" do
 
     # maps pipeline element names to rtp receiver roles
     property "receiver_map", "/gstreamer/rtpbin/receiver/PipelineMapping"
+
+    # maps pipeline element names to rtp sender roles
+    property "sender_map", "/gstreamer/rtpbin/sender/PipelineMapping"
 
     # Statistics output port
     output_port "rtp_statistics", "/gstreamer/RTPStatistics"

@@ -36,7 +36,7 @@ describe OroGen.gstreamer.RTPTask do
             @ports = 6.times.map { |_| allocate_available_port }
         end
 
-        it "can setup rtpbin as receiver with receiver::PipelineMapping" do
+        it "can setup rtpbin with pipeline mapping properties" do
             receiver_m =
                 OroGen.gstreamer.RTPTask
                 .with_arguments(
@@ -63,24 +63,30 @@ describe OroGen.gstreamer.RTPTask do
                 .with_arguments(
                     pipeline: <<~PIPELINE
                         rtpbin name=transmit rtp-profile=avpf
+                               fec-encoders=fec,0="rtpst2022-1-fecenc\\ rows\\=10\\ columns\\=10";
                         videotestsrc
                         ! x264enc speed-preset=ultrafast
                         ! rtph264pay ssrc=0 aggregate-mode=zero-latency config-interval=-1
-                        ! application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96
-                        ! transmit.send_rtp_sink_0
-                        transmit.send_rtp_src_0
-                        ! udpsink host=127.0.0.1 port=#{ports[0]}
-                        transmit.send_rtcp_src_0
-                        ! udpsink host=127.0.0.1 port=#{ports[1]} sync=false async=false
-                        udpsrc port=#{ports[2]}
-                        ! transmit.recv_rtcp_sink_0
+                        ! capsfilter name="rtp_src"
+                                     caps=application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96
+                        udpsink name="rtp_sink" host=127.0.0.1 port=#{ports[0]}
+                        udpsink name="rtcp_feedback_sink" host=127.0.0.1 port=#{ports[1]} sync=false async=false
+                        udpsrc name="rtcp_src" port=#{ports[2]}
+                        udpsink name="row_fec" host=127.0.0.1 port=#{ports[3]} async=false
+                        udpsink name="col_fec" host=127.0.0.1 port=#{ports[4]} async=false
                     PIPELINE
                 )
                 .with_arguments(rtp_monitoring_config:
                     { rtpbin_name: "transmit", sessions_id: [0] })
                 .deployed_as("rtptransmit")
 
-            syskit_deploy_configure_and_start(transmit_m)
+            sender_t = syskit_deploy(transmit_m)
+            sender_t.property_overrides.sender_map =
+                { session_id: 0, rtp_source: "rtp_src", rtp_sink: "rtp_sink",
+                  rtcp_source: "rtcp_src", rtcp_feedback_sink: "rtcp_feedback_sink",
+                  fec_sink_0: "row_fec", fec_sink_1: "col_fec" }
+            sender_t.needs_reconfiguration!
+            syskit_configure_and_start(sender_t)
 
             receiver_t = syskit_deploy(receiver_m)
             receiver_t.property_overrides.receiver_map =
