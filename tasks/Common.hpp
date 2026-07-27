@@ -88,7 +88,7 @@ namespace gstreamer {
         std::list<ConfiguredInput> m_configured_inputs;
         std::list<ConfiguredOutput> m_configured_outputs;
 
-        GstElement* m_pipeline = nullptr;
+        std::shared_ptr<GstElement> m_pipeline;
 
         void configureOutput(GstElement* pipeline,
             std::string const& appsink_name,
@@ -127,6 +127,9 @@ namespace gstreamer {
         void pushRawFrame(GstElement* element, GstVideoInfo& info, Frame const& frame);
         void pushCompressedFrame(GstElement* element, Frame const& frame);
         std::vector<DynamicPort> m_dynamic_ports;
+
+        bool m_logged_playing_pipeline{false};
+        std::string pipelineDotFileName() const;
 
     public:
         /** TaskContext constructor for Common

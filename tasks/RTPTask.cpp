@@ -10,6 +10,7 @@
 
 using namespace std;
 using namespace gstreamer;
+using namespace gstreamer::memory;
 using namespace base::samples::frame;
 
 RTPTask::RTPTask(std::string const& name)
@@ -72,7 +73,7 @@ bool RTPTask::configureHook()
         return false;
 
     m_rtp_monitoring_config = _rtp_monitoring_config.get();
-    GstUnrefGuard<GstElement> bin(gst_bin_get_by_name(GST_BIN(m_pipeline),
+    GstUnrefGuard<GstElement> bin(gst_bin_get_by_name(GST_BIN(m_pipeline.get()),
         m_rtp_monitoring_config.rtpbin_name.c_str()));
     if (!bin.get()) {
         throw std::runtime_error("cannot find element named " +

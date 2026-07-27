@@ -5,6 +5,7 @@
   <license>LGPLv2 or later</license>
   <depend package="base/cmake" />
   <depend package="base/orogen/types" />
+  <depend package="drivers/gstreamer" />
   <depend package="gstreamer" />
   <depend package="gstreamer-webrtc-dev" />
   <depend package="gstreamer-app-dev" />

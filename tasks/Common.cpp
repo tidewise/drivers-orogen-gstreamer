@@ -3,10 +3,13 @@
 #include "Common.hpp"
 #include "Helpers.hpp"
 
+#include <gstreamer/memory.hpp>
+
 #include <chrono>
 #include <thread>
 
 using namespace gstreamer;
+using namespace gstreamer::memory;
 using namespace std;
 
 Common::Common(std::string const& name)
@@ -29,12 +32,27 @@ bool Common::configureHook()
         return false;
 
     m_dynamic_ports.clear();
+    m_logged_playing_pipeline = false;
     return true;
 }
+
+std::string Common::pipelineDotFileName() const
+{
+    return getName() + "-" + std::to_string(getpid()) + "-" +
+           base::Time::now().toString();
+}
+
 bool Common::startHook()
 {
     if (!CommonBase::startHook())
         return false;
+
+    if (m_pipeline) {
+        // log pipeline dot file after all specializations configureHook
+        gst_debug_bin_to_dot_file(GST_BIN(m_pipeline.get()),
+            GST_DEBUG_GRAPH_SHOW_VERBOSE,
+            pipelineDotFileName().c_str());
+    }
 
     m_error_queue.clear();
     return true;
@@ -48,9 +66,17 @@ void Common::updateHook()
     }
 
     GstState state = GST_STATE_NULL;
-    gst_element_get_state(GST_ELEMENT(m_pipeline), &state, nullptr, 0);
+    gst_element_get_state(GST_ELEMENT(m_pipeline.get()), &state, nullptr, 0);
     if (state != GST_STATE_PLAYING) {
         return;
+    }
+
+    if (!m_logged_playing_pipeline) {
+        m_logged_playing_pipeline = true;
+        // log pipeline dot file after all specializations configureHook
+        gst_debug_bin_to_dot_file(GST_BIN(m_pipeline.get()),
+            GST_DEBUG_GRAPH_SHOW_VERBOSE,
+            pipelineDotFileName().c_str());
     }
 
     processInputs();
@@ -79,8 +105,10 @@ void Common::cleanupHook()
 
 void Common::destroyPipeline()
 {
-    gst_element_set_state(GST_ELEMENT(m_pipeline), GST_STATE_NULL);
-    gst_object_unref(m_pipeline);
+    if (m_pipeline.use_count() > 1) {
+        throw std::runtime_error("Pipeline has more than one owner");
+    }
+
     m_pipeline = nullptr;
     m_configured_inputs.clear();
     m_configured_outputs.clear();
@@ -90,9 +118,9 @@ void Common::startPipeline()
 {
     base::Time deadline = base::Time::now() + _pipeline_initialization_timeout.get();
 
-    gst_element_set_state(GST_ELEMENT(m_pipeline), GST_STATE_PAUSED);
+    gst_element_set_state(GST_ELEMENT(m_pipeline.get()), GST_STATE_PAUSED);
     waitForInitialData(deadline);
-    auto ret = gst_element_set_state(GST_ELEMENT(m_pipeline), GST_STATE_PLAYING);
+    auto ret = gst_element_set_state(GST_ELEMENT(m_pipeline.get()), GST_STATE_PLAYING);
     while (ret == GST_STATE_CHANGE_ASYNC) {
         if (base::Time::now() > deadline) {
             throw std::runtime_error("GStreamer pipeline failed to initialize within "
@@ -100,7 +128,7 @@ void Common::startPipeline()
         }
 
         GstClockTime timeout_ns = 50000000ULL;
-        ret = gst_element_get_state(GST_ELEMENT(m_pipeline), NULL, NULL, timeout_ns);
+        ret = gst_element_get_state(GST_ELEMENT(m_pipeline.get()), NULL, NULL, timeout_ns);
 
         processInputs();
     }
