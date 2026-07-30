@@ -35,7 +35,7 @@ bool WebRTCReceiveTask::configureHook()
 
     auto config = _signalling.get();
     if (!config.polite && !config.remote_peer_id.empty()) {
-        m_pipeline = std::shared_ptr<GstElement>(createPipeline(config.remote_peer_id),
+        m_pipeline = std::shared_ptr<GstBin>(createPipeline(config.remote_peer_id),
             memory::PipelineDestructor());
     }
     m_decode_queue_max_size_time = _decode_queue_max_size_time.get();
@@ -79,7 +79,7 @@ void WebRTCReceiveTask::processSignallingMessage(SignallingMessage const& messag
         if (m_pipeline) {
             destroyPipeline();
         }
-        m_pipeline = std::shared_ptr<GstElement>(createPipeline(message.from),
+        m_pipeline = std::shared_ptr<GstBin>(createPipeline(message.from),
             memory::PipelineDestructor());
         startPipeline();
         return;
@@ -94,7 +94,7 @@ void WebRTCReceiveTask::processSignallingMessage(SignallingMessage const& messag
         if (m_pipeline) {
             destroyPipeline();
         }
-        m_pipeline = std::shared_ptr<GstElement>(createPipeline(message.from),
+        m_pipeline = std::shared_ptr<GstBin>(createPipeline(message.from),
             memory::PipelineDestructor());
         startPipeline();
     }
@@ -149,7 +149,7 @@ string WebRTCReceiveTask::getCurrentPeer() const
 
     return m_peers.begin()->second.peer_id;
 }
-GstElement* WebRTCReceiveTask::createPipeline(string const& peer_id)
+GstBin* WebRTCReceiveTask::createPipeline(string const& peer_id)
 {
     GstUnrefGuard<GstElement> pipe(gst_pipeline_new("receivepipe"));
     GstElement* webrtc = gst_element_factory_make("webrtcbin", "webrtc");
@@ -163,7 +163,7 @@ GstElement* WebRTCReceiveTask::createPipeline(string const& peer_id)
 
     LOG_INFO_S << "Created pipeline " << hasPeer(peer_id);
 
-    return pipe.release();
+    return GST_BIN(pipe.release());
 
     // TODO: look into TWCC
 }
@@ -223,7 +223,7 @@ void WebRTCReceiveTask::onIncomingStream(GstElement* webrtcbin, GstPad* pad)
 
     auto const& peer = m_peers[webrtcbin];
     GstElement* bin = gst_bin_new((peer.peer_id + "_receivebin").c_str());
-    gst_bin_add(GST_BIN(m_pipeline.get()), bin);
+    gst_bin_add(m_pipeline.get(), bin);
 
     GstElement* q = gst_element_factory_make("queue", NULL);
     GstElement* decodebin = gst_element_factory_make("decodebin", NULL);

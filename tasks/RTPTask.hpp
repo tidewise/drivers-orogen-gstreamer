@@ -1,10 +1,12 @@
 #ifndef GSTREAMER_RTPTASK_TASK_HPP
 #define GSTREAMER_RTPTASK_TASK_HPP
 
+#include <base/Float.hpp>
+
 #include "Helpers.hpp"
 #include "gstreamer/RTPTaskBase.hpp"
-#include <base/Float.hpp>
 #include <gstreamer/memory.hpp>
+#include <gstreamer/rtpbin/receiver.hpp>
 
 namespace gstreamer {
     /*! \class RTPTask
@@ -27,6 +29,9 @@ namespace gstreamer {
      */
     class RTPTask : public RTPTaskBase {
         friend class RTPTaskBase;
+
+    protected:
+        std::optional<rtpbin::receiver::Context> m_receiver_context;
 
     public:
         /** TaskContext constructor for Task

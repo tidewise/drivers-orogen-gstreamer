@@ -36,7 +36,7 @@ namespace gstreamer {
         void updatePeersStats() override;
 
         std::string getCurrentPeer() const;
-        GstElement* createPipeline(std::string const& peer_id = "");
+        GstBin* createPipeline(std::string const& peer_id = "");
 
         static void callbackIncomingStream(GstElement* webrtcbin,
             GstPad* pad,

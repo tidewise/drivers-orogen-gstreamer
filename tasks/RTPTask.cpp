@@ -11,6 +11,7 @@
 using namespace std;
 using namespace gstreamer;
 using namespace gstreamer::memory;
+using namespace gstreamer::rtpbin;
 using namespace base::samples::frame;
 
 RTPTask::RTPTask(std::string const& name)
@@ -73,11 +74,19 @@ bool RTPTask::configureHook()
         return false;
 
     m_rtp_monitoring_config = _rtp_monitoring_config.get();
-    GstUnrefGuard<GstElement> bin(gst_bin_get_by_name(GST_BIN(m_pipeline.get()),
-        m_rtp_monitoring_config.rtpbin_name.c_str()));
+    std::string& rtpbin_name{m_rtp_monitoring_config.rtpbin_name};
+    GstUnrefGuard<GstElement> bin(
+        gst_bin_get_by_name(m_pipeline.get(), rtpbin_name.c_str()));
     if (!bin.get()) {
-        throw std::runtime_error("cannot find element named " +
-                                 m_rtp_monitoring_config.rtpbin_name + " in pipeline");
+        throw std::runtime_error(
+            "cannot find element named " + rtpbin_name + " in pipeline");
+    }
+
+    auto receiver_mapping = _receiver_map.get();
+    if (!receiver_mapping.undefined()) {
+        receiver::Context ctx = {m_pipeline, receiver_mapping};
+        m_receiver_context = ctx;
+        receiver::setup(rtpbin_name, *m_receiver_context);
     }
 
     std::vector<GstUnrefGuard<GstElement>> sessions;
@@ -130,5 +139,6 @@ void RTPTask::stopHook()
 void RTPTask::cleanupHook()
 {
     RTPTaskBase::cleanupHook();
+    m_receiver_context = std::nullopt;
     m_rtp_sessions.clear();
 }

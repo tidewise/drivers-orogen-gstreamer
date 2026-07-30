@@ -49,7 +49,7 @@ bool Common::startHook()
 
     if (m_pipeline) {
         // log pipeline dot file after all specializations configureHook
-        gst_debug_bin_to_dot_file(GST_BIN(m_pipeline.get()),
+        gst_debug_bin_to_dot_file(m_pipeline.get(),
             GST_DEBUG_GRAPH_SHOW_VERBOSE,
             pipelineDotFileName().c_str());
     }
@@ -74,7 +74,7 @@ void Common::updateHook()
     if (!m_logged_playing_pipeline) {
         m_logged_playing_pipeline = true;
         // log pipeline dot file after all specializations configureHook
-        gst_debug_bin_to_dot_file(GST_BIN(m_pipeline.get()),
+        gst_debug_bin_to_dot_file(m_pipeline.get(),
             GST_DEBUG_GRAPH_SHOW_VERBOSE,
             pipelineDotFileName().c_str());
     }
