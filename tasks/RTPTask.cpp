@@ -4,6 +4,9 @@
 #include <gst/gstcaps.h>
 #include <set>
 
+#include <gstreamer/rtpbin/receiver.hpp>
+#include <gstreamer/rtpbin/sender.hpp>
+
 #include "Helpers.hpp"
 #include "RTPHelpers.hpp"
 #include "RTPTask.hpp"
@@ -104,40 +107,28 @@ GstUnrefGuard<GstElement> RTPTask::pipelineConfigure()
             "cannot find element named " + rtpbin_name + " in pipeline");
     }
 
-    auto receiver_mapping = _receiver_map.get();
-    auto sender_mapping = _sender_map.get();
+    rtpbin::PipelineMapping mapping = _mapping.get();
 
-    uint8_t role{0};
-    if (!receiver_mapping.undefined()) {
-        role |= 0x1;
-        LOG_DEBUG_S << "receiver mappings defined" << std::endl;
-    }
-
-    if (!sender_mapping.undefined()) {
-        role |= 0x2;
-        LOG_DEBUG_S << "sender mappings defined" << std::endl;
-    }
-
-    if (!role) {
+    if (mapping.role == rtpbin::UNDEFINED) {
         return bin;
     }
 
-    switch (role) {
-        case 0x01: {
-            receiver::Context ctx = {m_pipeline, receiver_mapping};
-            m_receiver_context = ctx;
-        }
-            receiver::setup(rtpbin_name, *m_receiver_context);
+    if (mapping.undefined()) {
+        throw std::invalid_argument("mapping role defined but mapping is incomplete");
+    }
+
+    rtpbin::Context ctx = {m_pipeline, mapping};
+    m_context = ctx;
+
+    switch (mapping.role) {
+        case rtpbin::RECEIVER:
+            receiver::setup(rtpbin_name, *m_context);
             break;
-        case 0x02: {
-            sender::Context ctx = {m_pipeline, sender_mapping};
-            m_sender_context = ctx;
-        }
-            sender::setup(rtpbin_name, *m_sender_context);
+        case rtpbin::SENDER:
+            sender::setup(rtpbin_name, *m_context);
             break;
         default:
-            throw std::invalid_argument("The component can't be configured as sender "
-                                        "and receiver simultaneously.");
+            throw std::invalid_argument("unknown role");
     };
 
     return bin;
@@ -175,7 +166,6 @@ void RTPTask::stopHook()
 void RTPTask::cleanupHook()
 {
     RTPTaskBase::cleanupHook();
-    m_receiver_context = std::nullopt;
-    m_sender_context = std::nullopt;
+    m_context = std::nullopt;
     m_rtp_sessions.clear();
 }

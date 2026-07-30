@@ -30,8 +30,7 @@ namespace gstreamer {
         friend class RTPTaskBase;
 
     protected:
-        std::optional<rtpbin::receiver::Context> m_receiver_context;
-        std::optional<rtpbin::sender::Context> m_sender_context;
+        std::optional<rtpbin::Context> m_context;
 
         /**
          * Configure the \see m_pipeline rtpbin element as receiver or sender depending

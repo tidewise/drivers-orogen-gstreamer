@@ -81,19 +81,19 @@ describe OroGen.gstreamer.RTPTask do
                 .deployed_as("rtptransmit")
 
             sender_t = syskit_deploy(transmit_m)
-            sender_t.property_overrides.sender_map =
+            sender_t.property_overrides.mapping =
                 { session_id: 0, rtp_source: "rtp_src", rtp_sink: "rtp_sink",
                   rtcp_source: "rtcp_src", rtcp_feedback_sink: "rtcp_feedback_sink",
-                  fec_sink_0: "row_fec", fec_sink_1: "col_fec" }
+                  fec_0: "row_fec", fec_1: "col_fec", role: :SENDER }
             sender_t.needs_reconfiguration!
             syskit_configure_and_start(sender_t)
 
             receiver_t = syskit_deploy(receiver_m)
-            receiver_t.property_overrides.receiver_map =
+            receiver_t.property_overrides.mapping =
                 { session_id: 0, rtp_source: "rtp_src",
                   rtp_sink: "rtp_sink", rtcp_source: "rtcp_src",
                   rtcp_feedback_sink: "rtcp_feedback_sink",
-                  fec_source_0: "row_fec", fec_source_1: "col_fec" }
+                  fec_0: "row_fec", fec_1: "col_fec", role: :RECEIVER }
             receiver_t.needs_reconfiguration!
 
             syskit_configure_and_start(receiver_t)
