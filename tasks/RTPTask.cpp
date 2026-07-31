@@ -4,6 +4,9 @@
 #include <gst/gstcaps.h>
 #include <set>
 
+#include <gstreamer/rtpbin/receiver.hpp>
+#include <gstreamer/rtpbin/sender.hpp>
+
 #include "Helpers.hpp"
 #include "RTPHelpers.hpp"
 #include "RTPTask.hpp"
@@ -74,26 +77,13 @@ bool RTPTask::configureHook()
         return false;
 
     m_rtp_monitoring_config = _rtp_monitoring_config.get();
-    std::string& rtpbin_name{m_rtp_monitoring_config.rtpbin_name};
-    GstUnrefGuard<GstElement> bin(
-        gst_bin_get_by_name(m_pipeline.get(), rtpbin_name.c_str()));
-    if (!bin.get()) {
-        throw std::runtime_error(
-            "cannot find element named " + rtpbin_name + " in pipeline");
-    }
-
-    auto receiver_mapping = _receiver_map.get();
-    if (!receiver_mapping.undefined()) {
-        receiver::Context ctx = {m_pipeline, receiver_mapping};
-        m_receiver_context = ctx;
-        receiver::setup(rtpbin_name, *m_receiver_context);
-    }
+    auto rtpbin = pipelineConfigure();
 
     std::vector<GstUnrefGuard<GstElement>> sessions;
     sessions.reserve(m_rtp_monitoring_config.sessions_id.size());
     for (uint32_t session_id : m_rtp_monitoring_config.sessions_id) {
         GstElement* session{nullptr};
-        g_signal_emit_by_name(bin.get(), "get-session", session_id, &session);
+        g_signal_emit_by_name(rtpbin.get(), "get-session", session_id, &session);
         if (!session) {
             throw std::runtime_error(
                 "did not resolve provided session, wrong session ID " +
@@ -105,6 +95,43 @@ bool RTPTask::configureHook()
     m_rtp_sessions = std::move(sessions);
 
     return true;
+}
+
+GstUnrefGuard<GstElement> RTPTask::pipelineConfigure()
+{
+    std::string& rtpbin_name{m_rtp_monitoring_config.rtpbin_name};
+    GstUnrefGuard<GstElement> bin(
+        gst_bin_get_by_name(m_pipeline.get(), rtpbin_name.c_str()));
+    if (!bin.get()) {
+        throw std::runtime_error(
+            "cannot find element named " + rtpbin_name + " in pipeline");
+    }
+
+    rtpbin::PipelineMapping mapping = _mapping.get();
+
+    if (mapping.role == rtpbin::UNDEFINED) {
+        return bin;
+    }
+
+    if (mapping.undefined()) {
+        throw std::invalid_argument("mapping role defined but mapping is incomplete");
+    }
+
+    rtpbin::Context ctx = {m_pipeline, mapping};
+    m_context = ctx;
+
+    switch (mapping.role) {
+        case rtpbin::RECEIVER:
+            receiver::setup(rtpbin_name, *m_context);
+            break;
+        case rtpbin::SENDER:
+            sender::setup(rtpbin_name, *m_context);
+            break;
+        default:
+            throw std::invalid_argument("unknown role");
+    };
+
+    return bin;
 }
 
 bool RTPTask::startHook()
@@ -139,6 +166,6 @@ void RTPTask::stopHook()
 void RTPTask::cleanupHook()
 {
     RTPTaskBase::cleanupHook();
-    m_receiver_context = std::nullopt;
+    m_context = std::nullopt;
     m_rtp_sessions.clear();
 }

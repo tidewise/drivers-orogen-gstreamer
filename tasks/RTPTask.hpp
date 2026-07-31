@@ -6,7 +6,6 @@
 #include "Helpers.hpp"
 #include "gstreamer/RTPTaskBase.hpp"
 #include <gstreamer/memory.hpp>
-#include <gstreamer/rtpbin/receiver.hpp>
 
 namespace gstreamer {
     /*! \class RTPTask
@@ -31,7 +30,13 @@ namespace gstreamer {
         friend class RTPTaskBase;
 
     protected:
-        std::optional<rtpbin::receiver::Context> m_receiver_context;
+        std::optional<rtpbin::Context> m_context;
+
+        /**
+         * Configure the \see m_pipeline rtpbin element as receiver or sender depending
+         * on the configured pipeline mapping
+         */
+        memory::GstUnrefGuard<GstElement> pipelineConfigure();
 
     public:
         /** TaskContext constructor for Task
