@@ -6,6 +6,7 @@
 #include "Helpers.hpp"
 #include "gstreamer/RTPTaskBase.hpp"
 #include <gstreamer/memory.hpp>
+#include <optional>
 
 namespace gstreamer {
     /*! \class RTPTask
