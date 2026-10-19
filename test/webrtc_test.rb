@@ -13,6 +13,7 @@ describe OroGen.gstreamer.WebRTCCommonTask do
     run_live
 
     before do
+        system("gst-inspect-1.0")
         generator_m = OroGen.gstreamer.Task.with_dynamic_service(
             "image_source", as: "out"
         )
