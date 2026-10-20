@@ -2,6 +2,7 @@
 
 #include <base-logging/Logging.hpp>
 #include "base/Time.hpp"
+#include "gst/gstvalue.h"
 #include "iostream"
 
 using namespace gstreamer;
@@ -285,24 +286,23 @@ std::vector<RTPPeerReceiverReport> gstreamer::extractPeerReceiverReports(
     uint32_t clock_rate,
     uint64_t ntp_timestamp)
 {
-    const GValue* g_array_value = gst_structure_get_value(structure, "received-rr");
-
-    if (!g_array_value) {
+    const GValue* list = gst_structure_get_value(structure, "received-rr");
+    if (!list) {
         LOG_INFO_S << "peer-receiver_reports are empty";
         return {};
     }
 
     std::vector<RTPPeerReceiverReport> all_reports;
-    size_t array_size = gst_value_array_get_size(g_array_value);
-    for (size_t i = 0; i < array_size; i++) {
-        const GValue* report_value = gst_value_array_get_value(g_array_value, i);
+    size_t size = gst_value_list_get_size(list);
+    for (size_t i = 0; i < size; i++) {
+        const GValue* report_value = gst_value_list_get_value(list, i);
         if (!report_value) {
-            return all_reports;
+            continue;
         }
 
         const GstStructure* report_structure = gst_value_get_structure(report_value);
         if (!report_structure) {
-            return all_reports;
+            continue;
         }
 
         RTPPeerReceiverReport report;
